@@ -65,44 +65,4 @@ final class Prefs {
         for (java.util.Map.Entry<String, Long> e : hidden.entrySet()) set.add(e.getValue() + "|" + e.getKey());
         sp(c).edit().putStringSet(HIDDEN_SHOWS, set).apply();
     }
-
-    // ---- wishlist (titles saved from the featured view) ----------------------------------------------
-
-    private static final String WISHLIST = "wishlist";
-
-    static List<Tmdb.Brief> wishlist(Context c) {
-        List<Tmdb.Brief> out = new ArrayList<>();
-        try {
-            org.json.JSONArray a = new org.json.JSONArray(sp(c).getString(WISHLIST, "[]"));
-            for (int i = 0; i < a.length(); i++) {
-                org.json.JSONObject o = a.getJSONObject(i);
-                out.add(new Tmdb.Brief(o.getLong("id"), o.getBoolean("tv"), o.getString("title"),
-                        o.optString("poster", null), o.optString("backdrop", null), o.optString("year", null)));
-            }
-        } catch (org.json.JSONException ignored) {
-        }
-        return out;
-    }
-
-    static boolean inWishlist(Context c, Tmdb.Brief b) {
-        for (Tmdb.Brief w : wishlist(c)) if (w.key().equals(b.key())) return true;
-        return false;
-    }
-
-    /** Adds the title, or removes it when it's already there. Returns whether it's in the list now. */
-    static boolean toggleWishlist(Context c, Tmdb.Brief b) {
-        List<Tmdb.Brief> list = wishlist(c);
-        boolean removed = list.removeIf(w -> w.key().equals(b.key()));
-        if (!removed) list.add(0, b);
-        org.json.JSONArray a = new org.json.JSONArray();
-        try {
-            for (Tmdb.Brief w : list) {
-                a.put(new org.json.JSONObject().put("id", w.id).put("tv", w.tv).put("title", w.title)
-                        .put("poster", w.poster).put("backdrop", w.backdrop).put("year", w.year));
-            }
-        } catch (org.json.JSONException ignored) {
-        }
-        sp(c).edit().putString(WISHLIST, a.toString()).apply();
-        return !removed;
-    }
 }

@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!-- Frosted card (director and cast). No real blur on a TV GPU: a light translucent fill and a hairline. -->
-<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
-    <gradient android:angle="270" android:startColor="#4D3A3F47" android:endColor="#66272B31" />
-    <stroke android:width="0.5dp" android:color="#38FFFFFF" />
-    <corners android:radius="14dp" />
-</shape>

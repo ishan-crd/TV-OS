@@ -69,34 +69,28 @@ final class Posters {
 
     /** Main thread. The card-sized bitmap, from memory or loaded in the background; null on failure. */
     void load(String uri, Callback cb) {
-        load(uri, CARD_W, CARD_H, cb);
-    }
-
-    /** As {@link #load(String, Callback)}, decoded to at least about w×h pixels. */
-    void load(String uri, int w, int h, Callback cb) {
         if (uri == null) {
             cb.onLoaded(null, null);
             return;
         }
-        final String key = w == CARD_W && h == CARD_H ? uri : uri + "@" + w + "x" + h;
-        Bitmap b = mem.get(key);
+        Bitmap b = mem.get(uri);
         if (b != null) {
             cb.onLoaded(uri, b);
             return;
         }
-        List<Callback> waiting = pending.get(key);
+        List<Callback> waiting = pending.get(uri);
         if (waiting != null) {
             waiting.add(cb);
             return;
         }
         waiting = new ArrayList<>();
         waiting.add(cb);
-        pending.put(key, waiting);
+        pending.put(uri, waiting);
         io.execute(() -> {
-            Bitmap loaded = decode(uri, w, h);
+            Bitmap loaded = decode(uri, CARD_W, CARD_H);
             main.post(() -> {
-                if (loaded != null) mem.put(key, loaded);
-                List<Callback> cbs = pending.remove(key);
+                if (loaded != null) mem.put(uri, loaded);
+                List<Callback> cbs = pending.remove(uri);
                 if (cbs != null) for (Callback c : cbs) c.onLoaded(uri, loaded);
             });
         });

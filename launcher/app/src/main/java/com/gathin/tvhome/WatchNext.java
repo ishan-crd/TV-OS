@@ -23,8 +23,6 @@ final class WatchNext {
         final String pkg, title, episode, posterUri, intentUri;
         final long lastEngaged;
         final float progress;
-        /** A film rather than a series, season or episode (Watch Next type). */
-        boolean movie = true;
 
         Program(String pkg, String title, String episode, String posterUri, String intentUri,
                 long lastEngaged, float progress) {
@@ -59,7 +57,6 @@ final class WatchNext {
             TvContract.WatchNextPrograms.COLUMN_LAST_ENGAGEMENT_TIME_UTC_MILLIS,
             TvContract.WatchNextPrograms.COLUMN_DURATION_MILLIS,
             TvContract.WatchNextPrograms.COLUMN_LAST_PLAYBACK_POSITION_MILLIS,
-            TvContract.WatchNextPrograms.COLUMN_TYPE,
     };
 
     private WatchNext() {
@@ -93,10 +90,7 @@ final class WatchNext {
                 if (poster == null || poster.isEmpty()) poster = cur.getString(6);
                 long duration = cur.getLong(9), position = cur.getLong(10);
                 float progress = duration > 0 && position > 0 ? Math.min(1f, position / (float) duration) : 0f;
-                Program p = new Program(pkg, title, episode, poster, cur.getString(7), engaged, progress);
-                p.movie = cur.isNull(11) ? number == null
-                        : cur.getInt(11) == TvContract.WatchNextPrograms.TYPE_MOVIE;
-                out.add(p);
+                out.add(new Program(pkg, title, episode, poster, cur.getString(7), engaged, progress));
             }
         } catch (Exception e) {
             Log.w("WatchNext", "query failed", e);
