@@ -47,15 +47,6 @@ public class QuickPanelActivity extends Activity {
         if (mirror == null && !mirrorPkg.isEmpty()) mirror = getPackageManager().getLaunchIntentForPackage(mirrorPkg);
         final Intent mirrorIntent = mirror;
         java.util.List<Object[]> all = new java.util.ArrayList<>(java.util.Arrays.asList(new Object[][]{
-                {R.drawable.ic_qp_screensaver, R.string.qp_screensaver, null,
-                        (Action) () -> go(new Intent(this, ClockActivity.class))},
-                {R.drawable.ic_input, R.string.inputs, null,
-                        (Action) () -> go(new Intent("com.android.tv.action.VIEW_INPUTS"))},
-                {R.drawable.ic_qp_picture, R.string.qp_picture, null,
-                        (Action) () -> go(new Intent(Settings.ACTION_DISPLAY_SETTINGS))},
-                {R.drawable.ic_qp_sound, R.string.qp_sound, null,
-                        (Action) () -> go(new Intent("com.android.tv.action.VIEW_SOUND_SETTINGS"),
-                                new Intent(Settings.ACTION_SOUND_SETTINGS))},
                 {R.drawable.ic_wifi, R.string.wifi, networkName(), (Action) this::showWifi},
                 {R.drawable.ic_qp_bluetooth, R.string.qp_bluetooth, null,
                         // Android TV's own "Remotes & Accessories" page (Bluetooth on/off, pair, devices), opened
@@ -73,6 +64,15 @@ public class QuickPanelActivity extends Activity {
                                 go(new Intent(Settings.ACTION_SETTINGS));
                             }
                         }},
+                {R.drawable.ic_qp_picture, R.string.qp_picture, null,
+                        (Action) () -> go(new Intent(Settings.ACTION_DISPLAY_SETTINGS))},
+                {R.drawable.ic_qp_sound, R.string.qp_sound, null,
+                        (Action) () -> go(new Intent("com.android.tv.action.VIEW_SOUND_SETTINGS"),
+                                new Intent(Settings.ACTION_SOUND_SETTINGS))},
+                {R.drawable.ic_qp_screensaver, R.string.qp_screensaver, null,
+                        (Action) () -> go(new Intent(this, ClockActivity.class))},
+                {R.drawable.ic_input, R.string.inputs, null,
+                        (Action) () -> go(new Intent("com.android.tv.action.VIEW_INPUTS"))},
                 {R.drawable.ic_qp_display, R.string.qp_display_mode, null,
                         (Action) () -> go(new Intent("android.settings.oem.DISPLAYMODE_SETTINGS"),
                                 new Intent(Settings.ACTION_DISPLAY_SETTINGS))},
