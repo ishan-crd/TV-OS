@@ -1,0 +1,1744 @@
+From eda2623b0e5f11c7fcbc57406e7e76d5c498d6c6 Mon Sep 17 00:00:00 2001
+From: Ishan Gupta <93857652+ishan-crd@users.noreply.github.com>
+Date: Mon, 19 Oct 2026 16:02:38 +0530
+Subject: [PATCH] Featured films and series with TMDB details, cinema-style
+ hero
+
+Titles your apps report (Watch Next) are looked up on TMDB (key from local.properties, never
+committed) and shown with backdrop, poster, glass genre chips, facts, plot, Watch / Add to wishlist,
+rating and a director-and-cast card. Left/Right switch titles; rows below gain Similar movies
+(TMDB recommendations, poster cards that open their details) and a Wishlist. TMDB responses and
+images are cached on disk; everything loads off the main thread. Falls back to the app carousel
+without a key or matches.
+---
+ README.md                                     |  11 +
+ launcher/app/build.gradle                     |  11 +
+ .../java/com/gathin/tvhome/Backdrops.java     |   6 +
+ .../main/java/com/gathin/tvhome/HeroHome.java | 490 ++++++++++++++++--
+ .../main/java/com/gathin/tvhome/Posters.java  |  18 +-
+ .../main/java/com/gathin/tvhome/Prefs.java    |  40 ++
+ .../java/com/gathin/tvhome/RowAdapter.java    |  36 +-
+ .../src/main/java/com/gathin/tvhome/Tmdb.java | 277 ++++++++++
+ .../java/com/gathin/tvhome/WatchNext.java     |   8 +-
+ .../app/src/main/res/drawable/ic_mv_check.xml |   6 +
+ .../src/main/res/drawable/ic_mv_list_add.xml  |   6 +
+ .../app/src/main/res/drawable/mv_chip.xml     |   6 +
+ .../src/main/res/drawable/mv_glass_button.xml |  16 +
+ .../src/main/res/drawable/mv_glass_card.xml   |   7 +
+ .../app/src/main/res/layout/activity_hero.xml | 252 ++++++++-
+ .../src/main/res/layout/item_hero_poster.xml  |  83 +++
+ launcher/app/src/main/res/values/strings.xml  |  13 +
+ 17 files changed, 1238 insertions(+), 48 deletions(-)
+ create mode 100644 launcher/app/src/main/java/com/gathin/tvhome/Tmdb.java
+ create mode 100644 launcher/app/src/main/res/drawable/ic_mv_check.xml
+ create mode 100644 launcher/app/src/main/res/drawable/ic_mv_list_add.xml
+ create mode 100644 launcher/app/src/main/res/drawable/mv_chip.xml
+ create mode 100644 launcher/app/src/main/res/drawable/mv_glass_button.xml
+ create mode 100644 launcher/app/src/main/res/drawable/mv_glass_card.xml
+ create mode 100644 launcher/app/src/main/res/layout/item_hero_poster.xml
+
+diff --git a/README.md b/README.md
+index b71ac4a..838a530 100644
+--- a/README.md
++++ b/README.md
+@@ -15,6 +15,17 @@ install tools and debloat approach it builds on. The home screen design is inspi
+ 
+ **Hero home** (default):
+ 
++- **Featured films and series** (with a TMDB key): the titles your apps report as in progress (Android
++  TV's Watch Next), with TMDB details in a cinema layout: full-screen backdrop, poster, glass genre
++  chips, title, country · year · age rating · length, plot, a white **Watch movie** (resumes it in its
++  app) and a glass **Add to wishlist**, the rating (8.7/10, green/yellow/red) with review count, and a
++  glass card with the director (or creator) and cast, **See full cast** for up to eight. Left/Right
++  switches titles (a different order each day); below it, **Similar movies** posters from TMDB. Picking
++  one shows its details (Watch appears only for titles one of your apps has); saved titles form a
++  **Wishlist** row. Responses and images are cached on disk, so a resume needs no network.
++  Get a free key at themoviedb.org → Settings → API and put `tmdb.key=<API key>` in
++  `launcher/local.properties` (git-ignored). Without a key, the app carousel below is shown instead.
++
+ - **Featured carousel** of your four dock apps over full-screen ambient artwork in each app's own colour,
+   with the app's name, a line about it, an "App · Video · TODAY" line, a white **Open** button, info and
+   next buttons, and page dots. It advances every 9 seconds.
+diff --git a/launcher/app/build.gradle b/launcher/app/build.gradle
+index dce5f7f..97ac5ad 100644
+--- a/launcher/app/build.gradle
++++ b/launcher/app/build.gradle
+@@ -6,7 +6,18 @@ android {
+     namespace 'com.gathin.tvhome'
+     compileSdk 34
+ 
++    // TMDB API key for the featured movies' details (genres, rating, cast). Kept out of git: put
++    // tmdb.key=<your key> in launcher/local.properties (free at themoviedb.org → Settings → API).
++    def localProps = new Properties()
++    def lp = rootProject.file('local.properties')
++    if (lp.exists()) lp.withInputStream { localProps.load(it) }
++
++    buildFeatures {
++        buildConfig true
++    }
++
+     defaultConfig {
++        buildConfigField 'String', 'TMDB_KEY', '"' + (localProps.getProperty('tmdb.key') ?: '') + '"'
+         applicationId 'com.gathin.tvhome'
+         minSdk 26
+         targetSdk 34
+diff --git a/launcher/app/src/main/java/com/gathin/tvhome/Backdrops.java b/launcher/app/src/main/java/com/gathin/tvhome/Backdrops.java
+index f63eb88..ad1e43f 100644
+--- a/launcher/app/src/main/java/com/gathin/tvhome/Backdrops.java
++++ b/launcher/app/src/main/java/com/gathin/tvhome/Backdrops.java
+@@ -109,6 +109,12 @@ final class Backdrops {
+         });
+     }
+ 
++    /** Builds an image backdrop in the background so a later getImage() is instant. */
++    void preloadImage(String uri) {
++        String key = "img:" + uri;
++        if (cache.get(key) == null && !pending.containsKey(key)) getImage(uri, (k, b) -> { });
++    }
++
+     /** Builds it in the background so a later get() is instant. */
+     void preload(AppAdapter.Entry e) {
+         if (cache.get(e.pkg) == null && !pending.containsKey(e.pkg)) get(e, (p, b) -> { });
+diff --git a/launcher/app/src/main/java/com/gathin/tvhome/HeroHome.java b/launcher/app/src/main/java/com/gathin/tvhome/HeroHome.java
+index b21594a..e513d5d 100644
+--- a/launcher/app/src/main/java/com/gathin/tvhome/HeroHome.java
++++ b/launcher/app/src/main/java/com/gathin/tvhome/HeroHome.java
+@@ -35,11 +35,12 @@ final class HeroHome implements RowAdapter.Listener {
+ 
+     private static final long AUTO_ADVANCE_MS = 9000;
+     private static final long ROW_BACKDROP_DELAY_MS = 220;
+-    /** How far the page slides up when the rows take focus. */
+-    private static final float ROWS_SHIFT_DP = 386;
++    private static final long MOVIE_ADVANCE_MS = 12000;
++    /** How far the page slides up when the rows take focus (set by the hero mode). */
++    private float rowsShiftDp = 386;
+ 
+     // Static so they survive the activity being recreated while another app is open.
+-    private static String lastSlidePkg;
++    private static String lastSlidePkg, lastMovieKey;
+     private static int lastRow = -1, lastRowPos;
+ 
+     private final MainActivity act;
+@@ -52,8 +53,9 @@ final class HeroHome implements RowAdapter.Listener {
+     private final ImageView logo;
+     private final TextView title, meta, badge, tagline;
+     private final DotsView dots;
+-    /** 0 Your Apps, 1 Continue Watching, 2 All Apps. An empty row is hidden and skipped. */
+-    private static final int ROWS = 3;
++    /** 0 Similar, 1 Your Apps, 2 Continue Watching, 3 Wishlist, 4 All Apps. An empty row is hidden and skipped. */
++    private static final int ROWS = 5;
++    private static final int R_SIMILAR = 0, R_YOUR = 1, R_CONTINUE = 2, R_WISH = 3, R_ALL = 4;
+     private final RecyclerView[] rows = new RecyclerView[ROWS];
+     private final RowAdapter[] adapters = new RowAdapter[ROWS];
+     private final TextView[] rowTitles = new TextView[ROWS];
+@@ -75,11 +77,41 @@ final class HeroHome implements RowAdapter.Listener {
+     /** Extra darkening of the artwork at night (config.xml night_*), 0 by day. */
+     private float nightDim;
+ 
++    // ---- featured films and series (TMDB) ----
++    /** A title your apps report, with its TMDB details; program is null for one picked from a row. */
++    static final class Featured {
++        final Tmdb.Meta meta;
++        final WatchNext.Program program;
++        final AppAdapter.Entry app;
++
++        Featured(Tmdb.Meta meta, WatchNext.Program program, AppAdapter.Entry app) {
++            this.meta = meta;
++            this.program = program;
++            this.app = app;
++        }
++    }
++
++    private final Tmdb tmdb;
++    private final java.util.concurrent.ExecutorService worker = java.util.concurrent.Executors.newSingleThreadExecutor();
++    private final List<Featured> movies = new ArrayList<>();
++    private boolean movieMode;
++    /** The film or series on screen (a carousel entry, or one picked from Similar/Wishlist). */
++    private Featured shown;
++    private boolean fullCast;
++    private List<WatchNext.Program> programs = new ArrayList<>();
++    private final View movieHero, mvWatch, mvWish, mvFullCast, rowsBlock;
++    private final ImageView mvPoster, mvWishIcon;
++    private final TextView mvTitle, mvFacts, mvPlot, mvRating, mvVotes, mvWatchLabel, mvWishLabel;
++    private final android.widget.LinearLayout mvChips, mvCrew;
++
+     private final Runnable autoAdvance = new Runnable() {
+         @Override
+         public void run() {
+-            if (!inRows && slides.size() > 1 && act.hasWindowFocus()) showSlide(slide + 1, 1);
+-            handler.postDelayed(this, AUTO_ADVANCE_MS);
++            if (!inRows && slideCount() > 1 && act.hasWindowFocus() && (!movieMode || shown == null
++                    || shown.program != null)) {
++                showSlide(slide + 1, 1);
++            }
++            handler.postDelayed(this, movieMode ? MOVIE_ADVANCE_MS : AUTO_ADVANCE_MS);
+         }
+     };
+     private final Runnable rowBackdrop = () -> {
+@@ -106,16 +138,47 @@ final class HeroHome implements RowAdapter.Listener {
+         btnOpen = act.findViewById(R.id.btnOpen);
+         btnInfo = act.findViewById(R.id.btnInfo);
+         btnNext = act.findViewById(R.id.btnNext);
++        tmdb = new Tmdb(act);
++        movieHero = act.findViewById(R.id.movieHero);
++        rowsBlock = act.findViewById(R.id.rows);
++        mvPoster = act.findViewById(R.id.mvPoster);
++        mvTitle = act.findViewById(R.id.mvTitle);
++        mvFacts = act.findViewById(R.id.mvFacts);
++        mvPlot = act.findViewById(R.id.mvPlot);
++        mvRating = act.findViewById(R.id.mvRating);
++        mvVotes = act.findViewById(R.id.mvVotes);
++        mvChips = act.findViewById(R.id.mvChips);
++        mvCrew = act.findViewById(R.id.mvCrew);
++        mvWatch = act.findViewById(R.id.mvWatch);
++        mvWish = act.findViewById(R.id.mvWish);
++        mvWishIcon = act.findViewById(R.id.mvWishIcon);
++        mvWatchLabel = act.findViewById(R.id.mvWatchLabel);
++        mvWishLabel = act.findViewById(R.id.mvWishLabel);
++        mvFullCast = act.findViewById(R.id.mvFullCast);
++        roundCorners(mvPoster, 12);
++        mvWatch.setOnClickListener(v -> {
++            if (shown != null && shown.program != null) WatchNext.open(act, shown.program, shown.app);
++        });
++        mvWish.setOnClickListener(v -> {
++            if (shown == null) return;
++            Prefs.toggleWishlist(act, shown.meta.brief());
++            bindWish();
++            fillWishlist();
++        });
++        mvFullCast.setOnClickListener(v -> {
++            fullCast = !fullCast;
++            if (shown != null) bindCrew(shown.meta);
++        });
+ 
+-        int[] ids = {R.id.row1, R.id.row2, R.id.row3};
+-        int[] titleIds = {R.id.row1Title, R.id.row2Title, R.id.row3Title};
++        int[] ids = {R.id.row0, R.id.row1, R.id.row2, R.id.row3, R.id.row4};
++        int[] titleIds = {R.id.row0Title, R.id.row1Title, R.id.row2Title, R.id.row3Title, R.id.row4Title};
+         for (int i = 0; i < ROWS; i++) {
+             rows[i] = act.findViewById(ids[i]);
+             rowTitles[i] = act.findViewById(titleIds[i]);
+             rows[i].setLayoutManager(new LinearLayoutManager(act, LinearLayoutManager.HORIZONTAL, false));
+             rows[i].setItemAnimator(null);
+             rows[i].setHasFixedSize(true);
+-            adapters[i] = new RowAdapter(i, this);
++            adapters[i] = new RowAdapter(i, this, i == R_SIMILAR || i == R_WISH);
+             rows[i].setAdapter(adapters[i]);
+         }
+ 
+@@ -127,10 +190,10 @@ final class HeroHome implements RowAdapter.Listener {
+         });
+         btnNext.setOnClickListener(v -> showSlide(slide + 1, 1));
+         View.OnKeyListener heroKeys = this::onHeroKey;
+-        for (View b : new View[]{btnOpen, btnInfo, btnNext}) {
++        for (View b : new View[]{btnOpen, btnInfo, btnNext, mvWatch, mvWish, mvFullCast}) {
+             b.setOnKeyListener(heroKeys);
+             // Apple's focus growth: about 10 pt on the pill, more on the small circles.
+-            final float s = b == btnOpen ? 1.05f : 1.12f;
++            final float s = b == btnOpen || b == mvWatch || b == mvWish ? 1.05f : b == mvFullCast ? 1.04f : 1.12f;
+             b.setOnFocusChangeListener((v, f) -> v.animate().scaleX(f ? s : 1f).scaleY(f ? s : 1f)
+                     .setDuration(f ? 220 : 160).setInterpolator(new DecelerateInterpolator(1.4f)).start());
+         }
+@@ -152,6 +215,7 @@ final class HeroHome implements RowAdapter.Listener {
+     void onResume() {
+         buildRows();
+         updateNightDim(false);
++        loadMovies();
+         texts.clear();
+         logos.clear();
+         for (AppAdapter.Entry e : slides) {
+@@ -160,11 +224,9 @@ final class HeroHome implements RowAdapter.Listener {
+             Bitmap l = customLogo(e.pkg);
+             if (l != null) logos.put(e.pkg, l);
+         }
+-        dots.setCount(slides.size());
+-        int i = 0;
+-        for (int k = 0; k < slides.size(); k++) if (slides.get(k).pkg.equals(lastSlidePkg)) i = k;
++        dots.setCount(slideCount());
+         slide = -1;
+-        showSlide(i, 0);
++        showSlide(startIndex(), 0);
+ 
+         // Back from an app opened from a row: return to that card, otherwise to Open.
+         if (lastRow >= 0 && lastRow < ROWS && adapters[lastRow].getItemCount() > 0) {
+@@ -196,21 +258,22 @@ final class HeroHome implements RowAdapter.Listener {
+         List<RowAdapter.Item> first = new ArrayList<>();
+         for (String pkg : Prefs.list(act, Prefs.YOUR_APPS)) if (apps.containsKey(pkg)) first.add(new RowAdapter.Item(apps.get(pkg), null));
+         if (!first.isEmpty()) {
+-            rowTitles[0].setText(R.string.hero_your_apps);
++            rowTitles[R_YOUR].setText(R.string.hero_your_apps);
+         } else {
+             List<AppAdapter.Entry> recent = new ArrayList<>();
+             for (AppAdapter.Entry e : all) if (lastUsed.containsKey(e.pkg)) recent.add(e);
+             recent.sort((a, b) -> Long.compare(lastUsed.get(b.pkg), lastUsed.get(a.pkg)));
+             for (AppAdapter.Entry e : recent.subList(0, Math.min(12, recent.size()))) first.add(new RowAdapter.Item(e, null));
+-            rowTitles[0].setText(first.isEmpty() ? R.string.hero_favourites : R.string.hero_recent);
++            rowTitles[R_YOUR].setText(first.isEmpty() ? R.string.hero_favourites : R.string.hero_recent);
+             if (first.isEmpty()) for (AppAdapter.Entry e : slides) first.add(new RowAdapter.Item(e, null));
+         }
+-        setRow(0, first);
++        setRow(R_YOUR, first);
+ 
+         // Continue Watching: the shows apps report to Android TV's Watch Next list (needs READ_TV_LISTINGS).
+         // Without it, or with nothing reported, the video apps used in the last week, most recent first.
+         List<RowAdapter.Item> watching = new ArrayList<>();
+-        for (WatchNext.Program p : WatchNext.load(act, apps.keySet(), 20)) {
++        programs = WatchNext.load(act, apps.keySet(), 20);
++        for (WatchNext.Program p : programs) {
+             watching.add(new RowAdapter.Item(p, apps.get(p.pkg)));
+         }
+         if (watching.isEmpty()) {
+@@ -223,15 +286,16 @@ final class HeroHome implements RowAdapter.Listener {
+             used.sort((a, b) -> Long.compare(lastUsed.get(b.pkg), lastUsed.get(a.pkg)));
+             for (AppAdapter.Entry e : used) watching.add(new RowAdapter.Item(e, recency(e.pkg)));
+         }
+-        rowTitles[1].setText(R.string.hero_continue);
+-        setRow(1, watching);
++        rowTitles[R_CONTINUE].setText(R.string.hero_continue);
++        setRow(R_CONTINUE, watching);
++        fillWishlist();
+ 
+         List<AppAdapter.Entry> alpha = new ArrayList<>(all);
+         alpha.sort((a, b) -> a.label.compareToIgnoreCase(b.label));
+         List<RowAdapter.Item> allItems = new ArrayList<>();
+         for (AppAdapter.Entry e : alpha) allItems.add(new RowAdapter.Item(e, null));
+-        rowTitles[2].setText(R.string.hero_all_apps);
+-        setRow(2, allItems);
++        rowTitles[R_ALL].setText(R.string.hero_all_apps);
++        setRow(R_ALL, allItems);
+     }
+ 
+     /** Called every minute by MainActivity. */
+@@ -255,6 +319,10 @@ final class HeroHome implements RowAdapter.Listener {
+ 
+     /** dir: +1 next, -1 previous, 0 no animation. */
+     private void showSlide(int index, int dir) {
++        if (movieMode) {
++            showMovieSlide(index, dir);
++            return;
++        }
+         if (slides.isEmpty()) return;
+         int n = slides.size();
+         int i = ((index % n) + n) % n;
+@@ -314,30 +382,359 @@ final class HeroHome implements RowAdapter.Listener {
+         handler.removeCallbacks(autoAdvance);
+         handler.postDelayed(autoAdvance, AUTO_ADVANCE_MS);
+         switch (keyCode) {
+-            case KeyEvent.KEYCODE_DPAD_DOWN:
++            case KeyEvent.KEYCODE_DPAD_DOWN: {
++                int first = nextRow(-1, 1);
++                if (first < 0) return true;
+                 enterRows(true);
+-                focusCard(0, 0);
++                focusCard(first, 0);
+                 return true;
++            }
+             case KeyEvent.KEYCODE_DPAD_UP:
+                 act.findViewById(R.id.btnWifi).requestFocus();
+                 return true;
+             case KeyEvent.KEYCODE_DPAD_LEFT:
+-                if (v == btnOpen) {
++                if (v == btnOpen || v == mvWatch || (v == mvWish && mvWatch.getVisibility() != View.VISIBLE)) {
+                     showSlide(slide - 1, -1);
+                     return true;
+                 }
++                if (v == mvFullCast) {
++                    mvWish.requestFocus();
++                    return true;
++                }
+                 return false;
+             case KeyEvent.KEYCODE_DPAD_RIGHT:
+-                if (v == btnNext) {
++                if (v == btnNext || v == mvFullCast || (v == mvWish && mvFullCast.getVisibility() != View.VISIBLE)) {
+                     showSlide(slide + 1, 1);
+                     return true;
+                 }
++                if (v == mvWish) {
++                    mvFullCast.requestFocus();
++                    return true;
++                }
+                 return false;
+             default:
+                 return false;
+         }
+     }
+ 
++    // ---- featured films and series ----------------------------------------------------------------
++
++    private int slideCount() {
++        return movieMode ? movies.size() : slides.size();
++    }
++
++    /** The carousel entry to start on: the one shown last time. */
++    private int startIndex() {
++        if (movieMode) {
++            for (int k = 0; k < movies.size(); k++) if (movies.get(k).meta.brief().key().equals(lastMovieKey)) return k;
++            return 0;
++        }
++        for (int k = 0; k < slides.size(); k++) if (slides.get(k).pkg.equals(lastSlidePkg)) return k;
++        return 0;
++    }
++
++    /**
++     * Looks up the titles your apps report (Watch Next) on TMDB in the background; with at least one match
++     * the hero switches to the film view. Cached on disk, so after the first time this is quick and offline.
++     */
++    private void loadMovies() {
++        if (!tmdb.enabled()) return;
++        final List<WatchNext.Program> progs = new ArrayList<>(programs);
++        final Map<String, AppAdapter.Entry> appMap = new HashMap<>(apps);
++        worker.execute(() -> {
++            List<Featured> found = new ArrayList<>();
++            java.util.Set<String> seen = new java.util.HashSet<>();
++            for (WatchNext.Program p : progs) {
++                if (found.size() >= 10) break;
++                Tmdb.Meta m = tmdb.find(p.title, !p.movie);
++                if (m == null || m.backdrop == null || m.poster == null || !seen.add(m.brief().key())) continue;
++                found.add(new Featured(m, p, appMap.get(p.pkg)));
++            }
++            // A different order each day, so the home doesn't open on the same film every time.
++            java.util.Collections.shuffle(found, new java.util.Random(System.currentTimeMillis() / 86_400_000L));
++            handler.post(() -> setMovies(found));
++        });
++    }
++
++    private void setMovies(List<Featured> found) {
++        String before = shown != null && shown.program != null ? shown.meta.brief().key() : null;
++        List<String> oldKeys = new ArrayList<>(), newKeys = new ArrayList<>();
++        for (Featured f : movies) oldKeys.add(f.meta.brief().key());
++        for (Featured f : found) newKeys.add(f.meta.brief().key());
++        if (movieMode && oldKeys.equals(newKeys)) return;   // nothing changed since last resume
++        movies.clear();
++        movies.addAll(found);
++        boolean was = movieMode;
++        movieMode = !movies.isEmpty();
++        // Layout for the mode: the film view is taller, so the rows start and slide up from lower down.
++        heroText.setVisibility(movieMode ? View.GONE : View.VISIBLE);
++        buttons.setVisibility(movieMode ? View.GONE : View.VISIBLE);
++        movieHero.setVisibility(movieMode ? View.VISIBLE : View.GONE);
++        android.widget.FrameLayout.LayoutParams rl = (android.widget.FrameLayout.LayoutParams) rowsBlock.getLayoutParams();
++        rl.topMargin = Math.round((movieMode ? 400 : 456) * density);
++        rowsBlock.setLayoutParams(rl);
++        android.widget.FrameLayout.LayoutParams dl = (android.widget.FrameLayout.LayoutParams) dots.getLayoutParams();
++        dl.topMargin = Math.round((movieMode ? 381 : 423) * density);
++        dots.setLayoutParams(dl);
++        rowsShiftDp = movieMode ? 334 : 386;
++        if (!movieMode) setRow(R_SIMILAR, new ArrayList<>());
++        dots.setCount(slideCount());
++        if (inRows && was == movieMode) return;   // keep the rows as they are under the user's focus
++        slide = -1;
++        int i = 0;
++        for (int k = 0; k < movies.size(); k++) if (movies.get(k).meta.brief().key().equals(before != null ? before : lastMovieKey)) i = k;
++        showSlide(movieMode ? i : startIndex(), 0);
++        if (!inRows) {
++            if (movieMode) mvWatch.requestFocus();
++            else btnOpen.requestFocus();
++        }
++    }
++
++    private void showMovieSlide(int index, int dir) {
++        if (movies.isEmpty()) return;
++        int n = movies.size();
++        int i = ((index % n) + n) % n;
++        if (i == slide && shown != null && shown.program != null) return;
++        slide = i;
++        showFeatured(movies.get(i), dir);
++        dots.setActive(i, dir != 0);
++        lastMovieKey = movies.get(i).meta.brief().key();
++        // Neighbours' artwork in advance.
++        backdrops.preloadImage(Tmdb.IMG + "w780" + movies.get((i + 1) % n).meta.backdrop);
++    }
++
++    /** Puts a film or series in the hero: text slides, the backdrop crossfades. */
++    private void showFeatured(Featured f, int dir) {
++        boolean focusInside = movieHero.hasFocus();
++        shown = f;
++        fullCast = false;
++        if (dir == 0) {
++            movieHero.animate().cancel();
++            movieHero.setTranslationX(0f);
++            bindMovie(f);
++        } else {
++            final float dx = 14 * density * dir;
++            movieHero.animate().alpha(0f).translationX(-dx).setDuration(140).withLayer().withEndAction(() -> {
++                bindMovie(f);
++                movieHero.setTranslationX(dx);
++                movieHero.animate().alpha(inRows ? 0f : 1f).translationX(0f).setDuration(260)
++                        .setInterpolator(new DecelerateInterpolator(1.4f)).withLayer().start();
++            }).start();
++        }
++        if (!inRows) showMovieBackdrop(f.meta, dir != 0 || backA.getDrawable() != null);
++        if (!inRows) fillSimilar(f.meta);
++        if (focusInside && f.program == null && mvWatch.isFocused()) mvWish.requestFocus();
++    }
++
++    private void bindMovie(Featured f) {
++        Tmdb.Meta m = f.meta;
++        mvPoster.setImageDrawable(null);
++        final String key = m.brief().key();
++        Posters.get(act).load(Tmdb.IMG + "w342" + m.poster, 364, 540, (uri, bmp) -> {
++            if (bmp != null && shown != null && shown.meta.brief().key().equals(key)) mvPoster.setImageBitmap(bmp);
++        });
++        mvChips.removeAllViews();
++        for (String g : m.genres) mvChips.addView(chip(g));
++        mvTitle.setText(m.title);
++        List<String> facts = new ArrayList<>();
++        for (String x : new String[]{m.country, m.year, m.certification, m.length}) if (x != null && !x.isEmpty()) facts.add(x);
++        mvFacts.setText(android.text.TextUtils.join("  •  ", facts));
++        mvPlot.setText(m.overview);
++        // Rating: 8.7 large in green (yellow, red when lower), then a small /10.
++        if (m.votes > 0) {
++            String r = String.format(java.util.Locale.US, "%.1f", m.rating);
++            android.text.SpannableString sp = new android.text.SpannableString(r + "/10");
++            int color = m.rating >= 7 ? 0xFF5BD23C : m.rating >= 5 ? 0xFFF5C518 : 0xFFFF6B5B;
++            sp.setSpan(new android.text.style.ForegroundColorSpan(color), 0, r.length(), 0);
++            sp.setSpan(new android.text.style.RelativeSizeSpan(0.5f), r.length(), sp.length(), 0);
++            sp.setSpan(new android.text.style.ForegroundColorSpan(0xE6FFFFFF), r.length(), sp.length(), 0);
++            mvRating.setText(sp);
++            mvVotes.setText(act.getString(R.string.mv_reviews, compact(m.votes)));
++            mvRating.setVisibility(View.VISIBLE);
++            mvVotes.setVisibility(View.VISIBLE);
++        } else {
++            mvRating.setVisibility(View.GONE);
++            mvVotes.setVisibility(View.GONE);
++        }
++        bindCrew(m);
++        boolean playable = f.program != null;
++        mvWatch.setVisibility(playable ? View.VISIBLE : View.GONE);
++        mvWatchLabel.setText(m.tv ? R.string.mv_watch_show : R.string.mv_watch_movie);
++        bindWish();
++    }
++
++    private void bindWish() {
++        if (shown == null) return;
++        boolean in = Prefs.inWishlist(act, shown.meta.brief());
++        mvWishLabel.setText(in ? R.string.mv_in_wishlist : R.string.mv_add_wishlist);
++        mvWishIcon.setImageResource(in ? R.drawable.ic_mv_check : R.drawable.ic_mv_list_add);
++    }
++
++    /** Director (or creator) and the first three of the cast; "See full cast" shows up to eight. */
++    private void bindCrew(Tmdb.Meta m) {
++        mvCrew.removeAllViews();
++        if (m.director != null) {
++            mvCrew.addView(label(m.tv ? R.string.mv_creator : R.string.mv_director, false));
++            mvCrew.addView(person(m.director));
++        }
++        if (!m.cast.isEmpty()) {
++            mvCrew.addView(label(R.string.mv_cast, m.director != null));
++            int n = Math.min(fullCast ? 8 : 3, m.cast.size());
++            for (int i = 0; i < n; i++) mvCrew.addView(person(m.cast.get(i)));
++        }
++        boolean any = m.director != null || !m.cast.isEmpty();
++        mvCrew.setVisibility(any ? View.VISIBLE : View.GONE);
++        mvFullCast.setVisibility(m.cast.size() > 3 ? View.VISIBLE : View.GONE);
++        ((TextView) mvFullCast).setText(fullCast ? R.string.mv_less_cast : R.string.mv_full_cast);
++    }
++
++    private TextView label(int res, boolean gap) {
++        TextView t = new TextView(act);
++        t.setText(res);
++        t.setTextColor(0xD9FFFFFF);
++        t.setTextSize(9f);
++        t.setLetterSpacing(0.06f);
++        t.setTypeface(act.getResources().getFont(R.font.ui));
++        t.setFontVariationSettings("'wght' 500, 'opsz' 17");
++        android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(-2, -2);
++        lp.topMargin = Math.round((gap ? 9 : 2) * density);
++        lp.bottomMargin = Math.round(4 * density);
++        t.setLayoutParams(lp);
++        return t;
++    }
++
++    private View person(Tmdb.Person p) {
++        android.widget.LinearLayout row = new android.widget.LinearLayout(act);
++        row.setOrientation(android.widget.LinearLayout.HORIZONTAL);
++        row.setGravity(android.view.Gravity.CENTER_VERTICAL);
++        android.widget.LinearLayout.LayoutParams rl = new android.widget.LinearLayout.LayoutParams(-1, Math.round(23 * density));
++        row.setLayoutParams(rl);
++        ImageView face = new ImageView(act);
++        int sz = Math.round(18 * density);
++        face.setLayoutParams(new android.widget.LinearLayout.LayoutParams(sz, sz));
++        face.setScaleType(ImageView.ScaleType.CENTER_CROP);
++        face.setBackgroundColor(0x33FFFFFF);
++        face.setOutlineProvider(new android.view.ViewOutlineProvider() {
++            @Override
++            public void getOutline(View v, android.graphics.Outline o) {
++                o.setOval(0, 0, v.getWidth(), v.getHeight());
++            }
++        });
++        face.setClipToOutline(true);
++        if (p.photo != null) {
++            Posters.get(act).load(Tmdb.IMG + "w92" + p.photo, 48, 48, (uri, bmp) -> {
++                if (bmp != null) face.setImageBitmap(bmp);
++            });
++        }
++        TextView name = new TextView(act);
++        android.widget.LinearLayout.LayoutParams nl = new android.widget.LinearLayout.LayoutParams(0, -2, 1f);
++        nl.setMarginStart(Math.round(7 * density));
++        name.setLayoutParams(nl);
++        name.setText(p.name);
++        name.setSingleLine(true);
++        name.setEllipsize(android.text.TextUtils.TruncateAt.END);
++        name.setTextColor(0xFFFFFFFF);
++        name.setTextSize(11f);
++        name.setTypeface(act.getResources().getFont(R.font.ui));
++        name.setFontVariationSettings("'wght' 500, 'opsz' 17");
++        row.addView(face);
++        row.addView(name);
++        return row;
++    }
++
++    private TextView chip(String text) {
++        TextView t = new TextView(act);
++        t.setText(text);
++        t.setTextColor(0xFFFFFFFF);
++        t.setTextSize(10.5f);
++        t.setTypeface(act.getResources().getFont(R.font.ui));
++        t.setFontVariationSettings("'wght' 500, 'opsz' 17");
++        t.setGravity(android.view.Gravity.CENTER);
++        t.setIncludeFontPadding(false);
++        t.setBackgroundResource(R.drawable.mv_chip);
++        int ph = Math.round(13 * density);
++        t.setPadding(ph, 0, ph, 0);
++        android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(-2, -1);
++        lp.setMarginEnd(Math.round(5 * density));
++        t.setLayoutParams(lp);
++        return t;
++    }
++
++    private static String compact(int n) {
++        if (n >= 1_000_000) return String.format(java.util.Locale.US, "%.1fM", n / 1e6).replace(".0M", "M");
++        if (n >= 1_000) return (n / 1000) + "K";
++        return String.valueOf(n);
++    }
++
++    private void roundCorners(View v, float dp) {
++        final float r = dp * density;
++        v.setOutlineProvider(new android.view.ViewOutlineProvider() {
++            @Override
++            public void getOutline(View view, android.graphics.Outline o) {
++                o.setRoundRect(0, 0, view.getWidth(), view.getHeight(), r);
++            }
++        });
++        v.setClipToOutline(true);
++    }
++
++    /** Similar titles from TMDB for the film on screen. */
++    private void fillSimilar(Tmdb.Meta m) {
++        List<RowAdapter.Item> items = new ArrayList<>();
++        for (Tmdb.Brief b : m.similar) items.add(new RowAdapter.Item(b));
++        rowTitles[R_SIMILAR].setText(m.tv ? R.string.mv_similar_shows : R.string.mv_similar);
++        setRow(R_SIMILAR, items);
++    }
++
++    private void fillWishlist() {
++        List<RowAdapter.Item> items = new ArrayList<>();
++        for (Tmdb.Brief b : Prefs.wishlist(act)) items.add(new RowAdapter.Item(b));
++        rowTitles[R_WISH].setText(R.string.mv_wishlist);
++        setRow(R_WISH, items);
++    }
++
++    /**
++     * A title picked from Similar or Wishlist: its details in the hero. Watch shows when one of your apps
++     * reports it (Continue Watching); otherwise it can be added to the wishlist.
++     */
++    private void showBrief(Tmdb.Brief b) {
++        Featured inLibrary = null;
++        for (Featured f : movies) if (f.meta.brief().key().equals(b.key())) inLibrary = f;
++        if (inLibrary != null) {
++            exitRows(true);
++            showMovieSlide(movies.indexOf(inLibrary), 1);
++            return;
++        }
++        worker.execute(() -> {
++            Tmdb.Meta m = tmdb.details(b.id, b.tv);
++            if (m == null) return;
++            handler.post(() -> {
++                exitRows(true);
++                showFeatured(new Featured(m, null, null), 1);
++                mvWish.requestFocus();
++            });
++        });
++    }
++
++    private void showMovieBackdrop(Tmdb.Meta m, boolean animate) {
++        if (m.backdrop == null) return;
++        String uri = Tmdb.IMG + "w780" + m.backdrop;
++        String want = "img:" + uri;
++        if (want.equals(wantBackdrop)) return;
++        wantBackdrop = want;
++        backdrops.getImage(uri, (key, bmp) -> {
++            if (key.equals(wantBackdrop) && bmp != null) crossfade(bmp, animate);
++        });
++    }
++
++    private void showImageBackdrop(String uri) {
++        String want = "img:" + uri;
++        if (want.equals(wantBackdrop)) return;
++        wantBackdrop = want;
++        backdrops.getImage(uri, (key, bmp) -> {
++            if (key.equals(wantBackdrop) && bmp != null) crossfade(bmp, true);
++        });
++    }
++
+     // ---- backdrop --------------------------------------------------------------------------------
+ 
+     private void showBackdrop(AppAdapter.Entry e, boolean animate) {
+@@ -350,6 +747,10 @@ final class HeroHome implements RowAdapter.Listener {
+ 
+     /** A show's poster full screen; its app's backdrop when there is no poster or it won't load. */
+     private void showItemBackdrop(RowAdapter.Item it) {
++        if (it.brief != null) {
++            if (it.brief.backdrop != null) showImageBackdrop(Tmdb.IMG + "w780" + it.brief.backdrop);
++            return;
++        }
+         if (it.show == null || it.show.posterUri == null) {
+             if (it.app != null) showBackdrop(it.app, true);
+             return;
+@@ -405,11 +806,12 @@ final class HeroHome implements RowAdapter.Listener {
+         inRows = true;
+         long d = animate && !was ? 380 : 0;
+         if (!was) {
+-            page.animate().translationY(-ROWS_SHIFT_DP * density).setDuration(d)
++            page.animate().translationY(-rowsShiftDp * density).setDuration(d)
+                     .setInterpolator(new DecelerateInterpolator(2f)).start();
+         }
+         heroText.animate().alpha(0f).setDuration(d / 2).withLayer().start();
+         buttons.animate().alpha(0f).setDuration(d / 2).withLayer().start();
++        movieHero.animate().alpha(0f).setDuration(d / 2).withLayer().start();
+         dots.animate().alpha(0f).setDuration(d / 2).start();
+         applyDim(d);
+     }
+@@ -421,12 +823,25 @@ final class HeroHome implements RowAdapter.Listener {
+         long d = animate ? 380 : 0;
+         DecelerateInterpolator ease = new DecelerateInterpolator(2f);
+         page.animate().translationY(0f).setDuration(d).setInterpolator(ease).start();
++        // Rows faded out under the top bar while scrolled down come back.
++        for (int r = 0; r < ROWS; r++) {
++            rows[r].animate().cancel();
++            rowTitles[r].animate().cancel();
++            rows[r].setAlpha(1f);
++            rowTitles[r].setAlpha(1f);
++        }
+         heroText.animate().alpha(1f).setDuration(d).withLayer().start();
+         buttons.animate().alpha(1f).setDuration(d).withLayer().start();
++        movieHero.animate().alpha(1f).setDuration(d).withLayer().start();
+         dots.animate().alpha(1f).setDuration(d).start();
+         applyDim(d);
+-        if (!slides.isEmpty()) showBackdrop(slides.get(slide), animate);
+-        btnOpen.requestFocus();
++        if (movieMode) {
++            if (shown != null) showMovieBackdrop(shown.meta, animate);
++            (mvWatch.getVisibility() == View.VISIBLE ? mvWatch : mvWish).requestFocus();
++        } else {
++            if (!slides.isEmpty()) showBackdrop(slides.get(slide), animate);
++            btnOpen.requestFocus();
++        }
+         handler.removeCallbacks(autoAdvance);
+         handler.postDelayed(autoAdvance, AUTO_ADVANCE_MS);
+     }
+@@ -544,10 +959,11 @@ final class HeroHome implements RowAdapter.Listener {
+         if (second >= 0 && row != first && row != second) {
+             extra = rowTitles[row].getTop() - rowTitles[second].getTop();
+         }
+-        float y = -ROWS_SHIFT_DP * density - extra;
++        float y = -rowsShiftDp * density - extra;
+         // Rows that slide up under the top bar fade out instead of peeking out behind the pills.
+         for (int r = 0; r < ROWS; r++) {
+-            float alpha = extra > 0 && r < second ? 0f : 1f;
++            // Everything above the row placed at the top would sit under the top bar.
++            float alpha = extra > 0 && r < nextRow(row, -1) ? 0f : 1f;
+             if (rows[r].getAlpha() != alpha) {
+                 rows[r].animate().alpha(alpha).setDuration(animate ? 200 : 0).start();
+                 rowTitles[r].animate().alpha(alpha).setDuration(animate ? 200 : 0).start();
+@@ -571,7 +987,8 @@ final class HeroHome implements RowAdapter.Listener {
+ 
+     @Override
+     public void onCardClick(RowAdapter.Item it) {
+-        if (it.show != null) WatchNext.open(act, it.show, it.app);
++        if (it.brief != null) showBrief(it.brief);
++        else if (it.show != null) WatchNext.open(act, it.show, it.app);
+         else AppAdapter.launch(act, it.app);
+     }
+ 
+@@ -584,9 +1001,8 @@ final class HeroHome implements RowAdapter.Listener {
+     private void onMenuChanged(String focusKey) {
+         int row = lastRow;
+         buildRows();
+-        dots.setCount(slides.size());
+-        int i = 0;
+-        for (int k = 0; k < slides.size(); k++) if (slides.get(k).pkg.equals(lastSlidePkg)) i = k;
++        dots.setCount(slideCount());
++        int i = startIndex();
+         slide = -1;
+         texts.clear();
+         for (AppAdapter.Entry e : slides) {
+diff --git a/launcher/app/src/main/java/com/gathin/tvhome/Posters.java b/launcher/app/src/main/java/com/gathin/tvhome/Posters.java
+index 2b364df..6706e26 100644
+--- a/launcher/app/src/main/java/com/gathin/tvhome/Posters.java
++++ b/launcher/app/src/main/java/com/gathin/tvhome/Posters.java
+@@ -69,28 +69,34 @@ final class Posters {
+ 
+     /** Main thread. The card-sized bitmap, from memory or loaded in the background; null on failure. */
+     void load(String uri, Callback cb) {
++        load(uri, CARD_W, CARD_H, cb);
++    }
++
++    /** As {@link #load(String, Callback)}, decoded to at least about w×h pixels. */
++    void load(String uri, int w, int h, Callback cb) {
+         if (uri == null) {
+             cb.onLoaded(null, null);
+             return;
+         }
+-        Bitmap b = mem.get(uri);
++        final String key = w == CARD_W && h == CARD_H ? uri : uri + "@" + w + "x" + h;
++        Bitmap b = mem.get(key);
+         if (b != null) {
+             cb.onLoaded(uri, b);
+             return;
+         }
+-        List<Callback> waiting = pending.get(uri);
++        List<Callback> waiting = pending.get(key);
+         if (waiting != null) {
+             waiting.add(cb);
+             return;
+         }
+         waiting = new ArrayList<>();
+         waiting.add(cb);
+-        pending.put(uri, waiting);
++        pending.put(key, waiting);
+         io.execute(() -> {
+-            Bitmap loaded = decode(uri, CARD_W, CARD_H);
++            Bitmap loaded = decode(uri, w, h);
+             main.post(() -> {
+-                if (loaded != null) mem.put(uri, loaded);
+-                List<Callback> cbs = pending.remove(uri);
++                if (loaded != null) mem.put(key, loaded);
++                List<Callback> cbs = pending.remove(key);
+                 if (cbs != null) for (Callback c : cbs) c.onLoaded(uri, loaded);
+             });
+         });
+diff --git a/launcher/app/src/main/java/com/gathin/tvhome/Prefs.java b/launcher/app/src/main/java/com/gathin/tvhome/Prefs.java
+index 3cec81a..03b22a6 100644
+--- a/launcher/app/src/main/java/com/gathin/tvhome/Prefs.java
++++ b/launcher/app/src/main/java/com/gathin/tvhome/Prefs.java
+@@ -65,4 +65,44 @@ final class Prefs {
+         for (java.util.Map.Entry<String, Long> e : hidden.entrySet()) set.add(e.getValue() + "|" + e.getKey());
+         sp(c).edit().putStringSet(HIDDEN_SHOWS, set).apply();
+     }
++
++    // ---- wishlist (titles saved from the featured view) ----------------------------------------------
++
++    private static final String WISHLIST = "wishlist";
++
++    static List<Tmdb.Brief> wishlist(Context c) {
++        List<Tmdb.Brief> out = new ArrayList<>();
++        try {
++            org.json.JSONArray a = new org.json.JSONArray(sp(c).getString(WISHLIST, "[]"));
++            for (int i = 0; i < a.length(); i++) {
++                org.json.JSONObject o = a.getJSONObject(i);
++                out.add(new Tmdb.Brief(o.getLong("id"), o.getBoolean("tv"), o.getString("title"),
++                        o.optString("poster", null), o.optString("backdrop", null), o.optString("year", null)));
++            }
++        } catch (org.json.JSONException ignored) {
++        }
++        return out;
++    }
++
++    static boolean inWishlist(Context c, Tmdb.Brief b) {
++        for (Tmdb.Brief w : wishlist(c)) if (w.key().equals(b.key())) return true;
++        return false;
++    }
++
++    /** Adds the title, or removes it when it's already there. Returns whether it's in the list now. */
++    static boolean toggleWishlist(Context c, Tmdb.Brief b) {
++        List<Tmdb.Brief> list = wishlist(c);
++        boolean removed = list.removeIf(w -> w.key().equals(b.key()));
++        if (!removed) list.add(0, b);
++        org.json.JSONArray a = new org.json.JSONArray();
++        try {
++            for (Tmdb.Brief w : list) {
++                a.put(new org.json.JSONObject().put("id", w.id).put("tv", w.tv).put("title", w.title)
++                        .put("poster", w.poster).put("backdrop", w.backdrop).put("year", w.year));
++            }
++        } catch (org.json.JSONException ignored) {
++        }
++        sp(c).edit().putString(WISHLIST, a.toString()).apply();
++        return !removed;
++    }
+ }
+diff --git a/launcher/app/src/main/java/com/gathin/tvhome/RowAdapter.java b/launcher/app/src/main/java/com/gathin/tvhome/RowAdapter.java
+index d42221b..ccb57e3 100644
+--- a/launcher/app/src/main/java/com/gathin/tvhome/RowAdapter.java
++++ b/launcher/app/src/main/java/com/gathin/tvhome/RowAdapter.java
+@@ -27,6 +27,17 @@ final class RowAdapter extends RecyclerView.Adapter<RowAdapter.Holder> {
+         final String caption;
+         final AppAdapter.Entry app;
+         final WatchNext.Program show;
++        /** A title from TMDB (Similar, Wishlist): a poster card that opens its details in the hero. */
++        final Tmdb.Brief brief;
++
++        Item(Tmdb.Brief b) {
++            this.key = b.key();
++            this.title = b.title;
++            this.caption = b.year;
++            this.app = null;
++            this.show = null;
++            this.brief = b;
++        }
+ 
+         Item(AppAdapter.Entry app, String caption) {
+             this.key = app.component.flattenToShortString();
+@@ -34,6 +45,7 @@ final class RowAdapter extends RecyclerView.Adapter<RowAdapter.Holder> {
+             this.caption = caption;
+             this.app = app;
+             this.show = null;
++            this.brief = null;
+         }
+ 
+         Item(WatchNext.Program show, AppAdapter.Entry app) {
+@@ -42,6 +54,7 @@ final class RowAdapter extends RecyclerView.Adapter<RowAdapter.Holder> {
+             this.caption = show.episode != null ? show.episode : app != null ? app.label : null;
+             this.app = app;
+             this.show = show;
++            this.brief = null;
+         }
+     }
+ 
+@@ -62,9 +75,17 @@ final class RowAdapter extends RecyclerView.Adapter<RowAdapter.Holder> {
+     private final Listener listener;
+     private final List<Item> items = new ArrayList<>();
+ 
++    /** Portrait poster cards (TMDB titles) instead of 16:9 ones. */
++    private final boolean portrait;
++
+     RowAdapter(int row, Listener listener) {
++        this(row, listener, false);
++    }
++
++    RowAdapter(int row, Listener listener, boolean portrait) {
+         this.row = row;
+         this.listener = listener;
++        this.portrait = portrait;
+         setHasStableIds(true);
+     }
+ 
+@@ -96,7 +117,7 @@ final class RowAdapter extends RecyclerView.Adapter<RowAdapter.Holder> {
+     @NonNull
+     @Override
+     public Holder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+-        return new Holder(LayoutInflater.from(parent.getContext()).inflate(R.layout.item_hero_card, parent, false));
++        return new Holder(LayoutInflater.from(parent.getContext()).inflate(portrait ? R.layout.item_hero_poster : R.layout.item_hero_card, parent, false));
+     }
+ 
+     @Override
+@@ -109,7 +130,18 @@ final class RowAdapter extends RecyclerView.Adapter<RowAdapter.Holder> {
+         h.card.setScaleX(focused ? FOCUS_SCALE : 1f);
+         h.card.setScaleY(focused ? FOCUS_SCALE : 1f);
+ 
+-        if (it.show != null) {
++        if (it.brief != null) {
++            h.progressTrack.setVisibility(View.GONE);
++            h.banner.setImageDrawable(null);
++            h.banner.setVisibility(View.VISIBLE);
++            showFallback(h, null, it.title);
++            final String key = it.key;
++            Posters.get(h.itemView.getContext()).load(Tmdb.IMG + "w342" + it.brief.poster, 240, 360, (uri, bmp) -> {
++                if (bmp == null || !key.equals(h.boundKey)) return;
++                h.banner.setImageBitmap(bmp);
++                h.label.setVisibility(View.GONE);
++            });
++        } else if (it.show != null) {
+             // Poster, loaded in the background; the app's icon and the title stand in until it arrives.
+             h.banner.setImageDrawable(null);
+             h.banner.setVisibility(View.VISIBLE);
+diff --git a/launcher/app/src/main/java/com/gathin/tvhome/Tmdb.java b/launcher/app/src/main/java/com/gathin/tvhome/Tmdb.java
+new file mode 100644
+index 0000000..0a5d1aa
+--- /dev/null
++++ b/launcher/app/src/main/java/com/gathin/tvhome/Tmdb.java
+@@ -0,0 +1,277 @@
++package com.gathin.tvhome;
++
++import android.content.Context;
++import android.net.Uri;
++
++import org.json.JSONArray;
++import org.json.JSONObject;
++
++import java.io.ByteArrayOutputStream;
++import java.io.File;
++import java.io.FileInputStream;
++import java.io.FileOutputStream;
++import java.io.InputStream;
++import java.net.HttpURLConnection;
++import java.net.URL;
++import java.nio.charset.StandardCharsets;
++import java.util.ArrayList;
++import java.util.List;
++import java.util.Locale;
++
++/**
++ * Film and series details from TMDB (themoviedb.org) for the featured carousel: genres, rating, plot,
++ * director and cast, artwork and recommendations. Blocking calls, for a background thread. Responses are
++ * kept on disk for a week, so a resume costs no network. Needs BuildConfig.TMDB_KEY (local.properties
++ * tmdb.key); without it every lookup returns null and the home falls back to the app carousel.
++ */
++final class Tmdb {
++
++    static final String IMG = "https://image.tmdb.org/t/p/";
++    private static final String API = "https://api.themoviedb.org/3/";
++    private static final long TTL_MS = 7L * 24 * 3600 * 1000;
++
++    /** One cast or crew member. */
++    static final class Person {
++        final String name, photo;
++
++        Person(String name, String photo) {
++            this.name = name;
++            this.photo = photo;
++        }
++    }
++
++    /** A title in a row: enough for its poster card and to look up its details. */
++    static final class Brief {
++        final long id;
++        final boolean tv;
++        final String title, poster, backdrop, year;
++
++        Brief(long id, boolean tv, String title, String poster, String backdrop, String year) {
++            this.id = id;
++            this.tv = tv;
++            this.title = title;
++            this.poster = poster;
++            this.backdrop = backdrop;
++            this.year = year;
++        }
++
++        String key() {
++            return (tv ? "tv:" : "movie:") + id;
++        }
++    }
++
++    /** Everything the featured view shows. */
++    static final class Meta {
++        long id;
++        boolean tv;
++        String title, overview, country, year, certification, length, poster, backdrop;
++        double rating;
++        int votes;
++        final List<String> genres = new ArrayList<>();
++        /** Director, or the creator for a series. */
++        Person director;
++        final List<Person> cast = new ArrayList<>();
++        final List<Brief> similar = new ArrayList<>();
++
++        Brief brief() {
++            return new Brief(id, tv, title, poster, backdrop, year);
++        }
++    }
++
++    private final File dir;
++    private final String key = BuildConfig.TMDB_KEY;
++
++    Tmdb(Context c) {
++        dir = new File(c.getCacheDir(), "tmdb");
++        //noinspection ResultOfMethodCallIgnored
++        dir.mkdirs();
++    }
++
++    boolean enabled() {
++        return !key.isEmpty();
++    }
++
++    /** The best match for a title from an app, or null. `tv` picks the series search first. */
++    Meta find(String title, boolean tv) {
++        if (!enabled() || title == null) return null;
++        String clean = title.replaceAll("(?i)\\s*\\((19|20)\\d\\d\\)\\s*$", "").trim();
++        Long id = search(clean, tv);
++        boolean asTv = tv;
++        if (id == null) {
++            id = search(clean, !tv);
++            asTv = !tv;
++        }
++        return id == null ? null : details(id, asTv);
++    }
++
++    /** Full details for a known title. */
++    Meta details(long id, boolean tv) {
++        if (!enabled()) return null;
++        JSONObject d = get((tv ? "tv/" : "movie/") + id, "append_to_response",
++                tv ? "credits,content_ratings,recommendations" : "credits,release_dates,recommendations");
++        return d == null ? null : parse(d, tv);
++    }
++
++    private Long search(String query, boolean tv) {
++        JSONObject r = get(tv ? "search/tv" : "search/movie", "query", query);
++        if (r == null) return null;
++        JSONArray res = r.optJSONArray("results");
++        if (res == null || res.length() == 0) return null;
++        // An exact title match among the first few wins; otherwise the most popular result.
++        String q = norm(query);
++        for (int i = 0; i < Math.min(5, res.length()); i++) {
++            JSONObject o = res.optJSONObject(i);
++            if (o != null && norm(o.optString(tv ? "name" : "title")).equals(q)) return o.optLong("id");
++        }
++        JSONObject first = res.optJSONObject(0);
++        return first == null ? null : first.optLong("id");
++    }
++
++    private static String norm(String s) {
++        return s == null ? "" : s.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]", "");
++    }
++
++    private static Meta parse(JSONObject d, boolean tv) {
++        Meta m = new Meta();
++        m.id = d.optLong("id");
++        m.tv = tv;
++        m.title = d.optString(tv ? "name" : "title");
++        m.overview = d.optString("overview", "");
++        m.rating = d.optDouble("vote_average", 0);
++        m.votes = d.optInt("vote_count", 0);
++        m.poster = str(d, "poster_path");
++        m.backdrop = str(d, "backdrop_path");
++        String date = d.optString(tv ? "first_air_date" : "release_date", "");
++        m.year = date.length() >= 4 ? date.substring(0, 4) : null;
++        JSONArray g = d.optJSONArray("genres");
++        for (int i = 0; g != null && i < g.length() && m.genres.size() < 3; i++) {
++            String name = g.optJSONObject(i).optString("name");
++            // TMDB's long series genres: keep the first word pair readable on a chip.
++            m.genres.add(name.replace("Action & Adventure", "Action").replace("Sci-Fi & Fantasy", "Sci-fi")
++                    .replace("Science Fiction", "Sci-fi"));
++        }
++        if (tv) {
++            JSONArray oc = d.optJSONArray("origin_country");
++            m.country = oc != null && oc.length() > 0 ? oc.optString(0) : null;
++            int seasons = d.optInt("number_of_seasons", 0);
++            m.length = seasons > 0 ? seasons + (seasons == 1 ? " Season" : " Seasons") : null;
++            JSONArray by = d.optJSONArray("created_by");
++            if (by != null && by.length() > 0) {
++                JSONObject p = by.optJSONObject(0);
++                m.director = new Person(p.optString("name"), str(p, "profile_path"));
++            }
++            m.certification = rating(d.optJSONObject("content_ratings"), false);
++        } else {
++            JSONArray pc = d.optJSONArray("production_countries");
++            m.country = pc != null && pc.length() > 0 ? pc.optJSONObject(0).optString("iso_3166_1") : null;
++            int min = d.optInt("runtime", 0);
++            m.length = min > 0 ? (min / 60 > 0 ? (min / 60) + "h " : "") + (min % 60) + "m" : null;
++            m.certification = rating(d.optJSONObject("release_dates"), true);
++        }
++        if ("US".equals(m.country)) m.country = "USA";
++        else if ("GB".equals(m.country)) m.country = "UK";
++        else if ("IN".equals(m.country)) m.country = "India";
++        JSONObject credits = d.optJSONObject("credits");
++        if (credits != null) {
++            JSONArray crew = credits.optJSONArray("crew");
++            for (int i = 0; m.director == null && crew != null && i < crew.length(); i++) {
++                JSONObject p = crew.optJSONObject(i);
++                if ("Director".equals(p.optString("job"))) m.director = new Person(p.optString("name"), str(p, "profile_path"));
++            }
++            JSONArray cast = credits.optJSONArray("cast");
++            for (int i = 0; cast != null && i < cast.length() && m.cast.size() < 8; i++) {
++                JSONObject p = cast.optJSONObject(i);
++                m.cast.add(new Person(p.optString("name"), str(p, "profile_path")));
++            }
++        }
++        JSONObject recs = d.optJSONObject("recommendations");
++        JSONArray rr = recs == null ? null : recs.optJSONArray("results");
++        for (int i = 0; rr != null && i < rr.length() && m.similar.size() < 12; i++) {
++            JSONObject o = rr.optJSONObject(i);
++            String poster = str(o, "poster_path");
++            if (poster == null) continue;
++            boolean isTv = "tv".equals(o.optString("media_type", tv ? "tv" : "movie"));
++            String dt = o.optString(isTv ? "first_air_date" : "release_date", "");
++            m.similar.add(new Brief(o.optLong("id"), isTv, o.optString(isTv ? "name" : "title"), poster,
++                    str(o, "backdrop_path"), dt.length() >= 4 ? dt.substring(0, 4) : null));
++        }
++        return m;
++    }
++
++    /** The age rating for India, else the US, from release_dates (films) or content_ratings (series). */
++    private static String rating(JSONObject o, boolean film) {
++        JSONArray res = o == null ? null : o.optJSONArray("results");
++        if (res == null) return null;
++        for (String country : new String[]{"IN", "US"}) {
++            for (int i = 0; i < res.length(); i++) {
++                JSONObject c = res.optJSONObject(i);
++                if (!country.equals(c.optString("iso_3166_1"))) continue;
++                if (!film) {
++                    String r = c.optString("rating", "");
++                    if (!r.isEmpty()) return r;
++                    continue;
++                }
++                JSONArray rd = c.optJSONArray("release_dates");
++                for (int j = 0; rd != null && j < rd.length(); j++) {
++                    String r = rd.optJSONObject(j).optString("certification", "");
++                    if (!r.isEmpty()) return r;
++                }
++            }
++        }
++        return null;
++    }
++
++    private static String str(JSONObject o, String k) {
++        String v = o.optString(k, "");
++        return v.isEmpty() || "null".equals(v) ? null : v;
++    }
++
++    /** GET with the API key, from the disk cache when fresh. Null on any failure. */
++    private JSONObject get(String path, String param, String value) {
++        Uri.Builder b = Uri.parse(API + path).buildUpon().appendQueryParameter("api_key", key)
++                .appendQueryParameter("language", "en-US");
++        if (param != null) b.appendQueryParameter(param, value);
++        String url = b.build().toString();
++        File f = new File(dir, Integer.toHexString((path + "|" + value).hashCode()) + ".json");
++        if (f.isFile() && System.currentTimeMillis() - f.lastModified() < TTL_MS) {
++            try {
++                return new JSONObject(read(new FileInputStream(f)));
++            } catch (Exception ignored) {
++            }
++        }
++        HttpURLConnection c = null;
++        try {
++            c = (HttpURLConnection) new URL(url).openConnection();
++            c.setConnectTimeout(8000);
++            c.setReadTimeout(12000);
++            if (c.getResponseCode() != 200) return null;
++            String body = read(c.getInputStream());
++            JSONObject json = new JSONObject(body);
++            try (FileOutputStream out = new FileOutputStream(f)) {
++                out.write(body.getBytes(StandardCharsets.UTF_8));
++            }
++            return json;
++        } catch (Exception e) {
++            // Offline: a stale copy beats nothing.
++            if (f.isFile()) {
++                try {
++                    return new JSONObject(read(new FileInputStream(f)));
++                } catch (Exception ignored) {
++                }
++            }
++            return null;
++        } finally {
++            if (c != null) c.disconnect();
++        }
++    }
++
++    private static String read(InputStream in) throws java.io.IOException {
++        try (InputStream is = in) {
++            ByteArrayOutputStream out = new ByteArrayOutputStream();
++            byte[] buf = new byte[16384];
++            int n;
++            while ((n = is.read(buf)) > 0) out.write(buf, 0, n);
++            return out.toString("UTF-8");
++        }
++    }
++}
+diff --git a/launcher/app/src/main/java/com/gathin/tvhome/WatchNext.java b/launcher/app/src/main/java/com/gathin/tvhome/WatchNext.java
+index ecf1180..da1a135 100644
+--- a/launcher/app/src/main/java/com/gathin/tvhome/WatchNext.java
++++ b/launcher/app/src/main/java/com/gathin/tvhome/WatchNext.java
+@@ -23,6 +23,8 @@ final class WatchNext {
+         final String pkg, title, episode, posterUri, intentUri;
+         final long lastEngaged;
+         final float progress;
++        /** A film rather than a series, season or episode (Watch Next type). */
++        boolean movie = true;
+ 
+         Program(String pkg, String title, String episode, String posterUri, String intentUri,
+                 long lastEngaged, float progress) {
+@@ -57,6 +59,7 @@ final class WatchNext {
+             TvContract.WatchNextPrograms.COLUMN_LAST_ENGAGEMENT_TIME_UTC_MILLIS,
+             TvContract.WatchNextPrograms.COLUMN_DURATION_MILLIS,
+             TvContract.WatchNextPrograms.COLUMN_LAST_PLAYBACK_POSITION_MILLIS,
++            TvContract.WatchNextPrograms.COLUMN_TYPE,
+     };
+ 
+     private WatchNext() {
+@@ -90,7 +93,10 @@ final class WatchNext {
+                 if (poster == null || poster.isEmpty()) poster = cur.getString(6);
+                 long duration = cur.getLong(9), position = cur.getLong(10);
+                 float progress = duration > 0 && position > 0 ? Math.min(1f, position / (float) duration) : 0f;
+-                out.add(new Program(pkg, title, episode, poster, cur.getString(7), engaged, progress));
++                Program p = new Program(pkg, title, episode, poster, cur.getString(7), engaged, progress);
++                p.movie = cur.isNull(11) ? number == null
++                        : cur.getInt(11) == TvContract.WatchNextPrograms.TYPE_MOVIE;
++                out.add(p);
+             }
+         } catch (Exception e) {
+             Log.w("WatchNext", "query failed", e);
+diff --git a/launcher/app/src/main/res/drawable/ic_mv_check.xml b/launcher/app/src/main/res/drawable/ic_mv_check.xml
+new file mode 100644
+index 0000000..f31e8c8
+--- /dev/null
++++ b/launcher/app/src/main/res/drawable/ic_mv_check.xml
+@@ -0,0 +1,6 @@
++<?xml version="1.0" encoding="utf-8"?>
++<vector xmlns:android="http://schemas.android.com/apk/res/android"
++    android:width="24dp" android:height="24dp"
++    android:viewportWidth="24" android:viewportHeight="24">
++    <path android:fillColor="#FFFFFFFF" android:pathData="M9,16.17L4.83,12l-1.42,1.41L9,19 21,7l-1.41,-1.41z" />
++</vector>
+diff --git a/launcher/app/src/main/res/drawable/ic_mv_list_add.xml b/launcher/app/src/main/res/drawable/ic_mv_list_add.xml
+new file mode 100644
+index 0000000..8c9adcf
+--- /dev/null
++++ b/launcher/app/src/main/res/drawable/ic_mv_list_add.xml
+@@ -0,0 +1,6 @@
++<?xml version="1.0" encoding="utf-8"?>
++<vector xmlns:android="http://schemas.android.com/apk/res/android"
++    android:width="24dp" android:height="24dp"
++    android:viewportWidth="24" android:viewportHeight="24">
++    <path android:fillColor="#FFFFFFFF" android:pathData="M3,6h12v2H3zM3,10h12v2H3zM3,14h8v2H3zM17,14v-3h2v3h3v2h-3v3h-2v-3h-3v-2z" />
++</vector>
+diff --git a/launcher/app/src/main/res/drawable/mv_chip.xml b/launcher/app/src/main/res/drawable/mv_chip.xml
+new file mode 100644
+index 0000000..e1719e6
+--- /dev/null
++++ b/launcher/app/src/main/res/drawable/mv_chip.xml
+@@ -0,0 +1,6 @@
++<?xml version="1.0" encoding="utf-8"?>
++<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
++    <gradient android:angle="270" android:startColor="#47FFFFFF" android:endColor="#33FFFFFF" />
++    <stroke android:width="0.5dp" android:color="#33FFFFFF" />
++    <corners android:radius="100dp" />
++</shape>
+diff --git a/launcher/app/src/main/res/drawable/mv_glass_button.xml b/launcher/app/src/main/res/drawable/mv_glass_button.xml
+new file mode 100644
+index 0000000..00cef5b
+--- /dev/null
++++ b/launcher/app/src/main/res/drawable/mv_glass_button.xml
+@@ -0,0 +1,16 @@
++<?xml version="1.0" encoding="utf-8"?>
++<selector xmlns:android="http://schemas.android.com/apk/res/android">
++    <item android:state_focused="true">
++        <shape android:shape="rectangle">
++            <solid android:color="#FFFFFFFF" />
++            <corners android:radius="100dp" />
++        </shape>
++    </item>
++    <item>
++        <shape android:shape="rectangle">
++            <gradient android:angle="270" android:startColor="#4D3A3F47" android:endColor="#66272B31" />
++            <stroke android:width="0.5dp" android:color="#38FFFFFF" />
++            <corners android:radius="100dp" />
++        </shape>
++    </item>
++</selector>
+diff --git a/launcher/app/src/main/res/drawable/mv_glass_card.xml b/launcher/app/src/main/res/drawable/mv_glass_card.xml
+new file mode 100644
+index 0000000..610dec1
+--- /dev/null
++++ b/launcher/app/src/main/res/drawable/mv_glass_card.xml
+@@ -0,0 +1,7 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!-- Frosted card (director and cast). No real blur on a TV GPU: a light translucent fill and a hairline. -->
++<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
++    <gradient android:angle="270" android:startColor="#4D3A3F47" android:endColor="#66272B31" />
++    <stroke android:width="0.5dp" android:color="#38FFFFFF" />
++    <corners android:radius="14dp" />
++</shape>
+diff --git a/launcher/app/src/main/res/layout/activity_hero.xml b/launcher/app/src/main/res/layout/activity_hero.xml
+index 095e3c5..35cee7c 100644
+--- a/launcher/app/src/main/res/layout/activity_hero.xml
++++ b/launcher/app/src/main/res/layout/activity_hero.xml
+@@ -38,7 +38,7 @@
+     <FrameLayout
+         android:id="@+id/page"
+         android:layout_width="match_parent"
+-        android:layout_height="1100dp"
++        android:layout_height="1600dp"
+         android:clipChildren="false"
+         android:clipToPadding="false">
+ 
+@@ -221,6 +221,232 @@
+             android:layout_gravity="center_horizontal"
+             android:layout_marginTop="423dp" />
+ 
++        <!-- Featured film or series (TMDB details for titles your apps report): poster, genre chips, title,
++             facts, plot, Watch / Wishlist, rating and a director-and-cast card. Shown instead of heroText,
++             buttons when there is at least one. -->
++        <FrameLayout
++            android:id="@+id/movieHero"
++            android:layout_width="match_parent"
++            android:layout_height="380dp"
++            android:clipChildren="false"
++            android:visibility="gone">
++
++            <ImageView
++                android:id="@+id/mvPoster"
++                android:layout_width="182dp"
++                android:layout_height="270dp"
++                android:layout_marginStart="52dp"
++                android:layout_marginTop="97dp"
++                android:background="@drawable/hero_card_bg"
++                android:scaleType="centerCrop"
++                android:elevation="6dp"
++                android:contentDescription="@null" />
++
++            <LinearLayout
++                android:id="@+id/mvInfo"
++                android:layout_width="340dp"
++                android:layout_height="wrap_content"
++                android:layout_marginStart="262dp"
++                android:layout_marginTop="97dp"
++                android:orientation="vertical">
++
++                <LinearLayout
++                    android:id="@+id/mvChips"
++                    android:layout_width="wrap_content"
++                    android:layout_height="22dp"
++                    android:orientation="horizontal" />
++
++                <TextView
++                    android:id="@+id/mvTitle"
++                    android:layout_width="match_parent"
++                    android:layout_height="wrap_content"
++                    android:layout_marginTop="14dp"
++                    android:maxLines="2"
++                    android:ellipsize="end"
++                    android:includeFontPadding="false"
++                    android:lineSpacingMultiplier="0.95"
++                    android:textColor="#FFFFFFFF"
++                    android:textSize="32sp"
++                    android:fontFamily="@font/ui"
++                    android:fontVariationSettings="'wght' 500, 'opsz' 28"
++                    android:letterSpacing="-0.01"
++                    android:shadowColor="#66000000"
++                    android:shadowDy="1"
++                    android:shadowRadius="6" />
++
++                <TextView
++                    android:id="@+id/mvFacts"
++                    android:layout_width="match_parent"
++                    android:layout_height="wrap_content"
++                    android:layout_marginTop="6dp"
++                    android:singleLine="true"
++                    android:textColor="#D9FFFFFF"
++                    android:textSize="11.5sp"
++                    android:fontFamily="@font/ui"
++                    android:fontVariationSettings="'wght' 500, 'opsz' 17" />
++
++                <TextView
++                    android:id="@+id/mvPlot"
++                    android:layout_width="270dp"
++                    android:layout_height="wrap_content"
++                    android:layout_marginTop="18dp"
++                    android:maxLines="4"
++                    android:ellipsize="end"
++                    android:lineSpacingMultiplier="1.28"
++                    android:textColor="#E6FFFFFF"
++                    android:textSize="12sp"
++                    android:fontFamily="@font/ui"
++                    android:fontVariationSettings="'wght' 400, 'opsz' 17" />
++            </LinearLayout>
++
++            <LinearLayout
++                android:id="@+id/mvButtons"
++                android:layout_width="wrap_content"
++                android:layout_height="36dp"
++                android:layout_marginStart="262dp"
++                android:layout_marginTop="331dp"
++                android:clipChildren="false"
++                android:orientation="horizontal">
++
++                <LinearLayout
++                    android:id="@+id/mvWatch"
++                    android:layout_width="wrap_content"
++                    android:layout_height="36dp"
++                    android:minWidth="140dp"
++                    android:paddingStart="20dp"
++                    android:paddingEnd="22dp"
++                    android:gravity="center"
++                    android:orientation="horizontal"
++                    android:background="@drawable/hero_pill_bg"
++                    android:focusable="true"
++                    android:clickable="true"
++                    android:nextFocusUp="@+id/btnWifi">
++
++                    <ImageView
++                        android:layout_width="14dp"
++                        android:layout_height="14dp"
++                        android:src="@drawable/ic_play"
++                        android:tint="@color/hero_btn_fg"
++                        android:duplicateParentState="true"
++                        android:contentDescription="@null" />
++
++                    <TextView
++                        android:id="@+id/mvWatchLabel"
++                        android:layout_width="wrap_content"
++                        android:layout_height="wrap_content"
++                        android:layout_marginStart="8dp"
++                        android:duplicateParentState="true"
++                        android:includeFontPadding="false"
++                        android:text="@string/mv_watch_movie"
++                        android:textColor="@color/hero_btn_fg"
++                        android:textSize="14.5sp"
++                        android:fontFamily="@font/ui"
++                        android:fontVariationSettings="'wght' 500, 'opsz' 17" />
++                </LinearLayout>
++
++                <LinearLayout
++                    android:id="@+id/mvWish"
++                    android:layout_width="wrap_content"
++                    android:layout_height="36dp"
++                    android:minWidth="140dp"
++                    android:layout_marginStart="9dp"
++                    android:paddingStart="20dp"
++                    android:paddingEnd="22dp"
++                    android:gravity="center"
++                    android:orientation="horizontal"
++                    android:background="@drawable/hero_pill_bg"
++                    android:focusable="true"
++                    android:clickable="true"
++                    android:nextFocusUp="@+id/btnWifi">
++
++                    <ImageView
++                        android:id="@+id/mvWishIcon"
++                        android:layout_width="15dp"
++                        android:layout_height="15dp"
++                        android:src="@drawable/ic_mv_list_add"
++                        android:tint="@color/hero_btn_fg"
++                        android:duplicateParentState="true"
++                        android:contentDescription="@null" />
++
++                    <TextView
++                        android:id="@+id/mvWishLabel"
++                        android:layout_width="wrap_content"
++                        android:layout_height="wrap_content"
++                        android:layout_marginStart="8dp"
++                        android:duplicateParentState="true"
++                        android:includeFontPadding="false"
++                        android:text="@string/mv_add_wishlist"
++                        android:textColor="@color/hero_btn_fg"
++                        android:textSize="14.5sp"
++                        android:fontFamily="@font/ui"
++                        android:fontVariationSettings="'wght' 500, 'opsz' 17" />
++                </LinearLayout>
++            </LinearLayout>
++
++            <!-- Right: rating, then director and cast. -->
++            <LinearLayout
++                android:id="@+id/mvSide"
++                android:layout_width="152dp"
++                android:layout_height="wrap_content"
++                android:layout_gravity="end"
++                android:layout_marginEnd="52dp"
++                android:layout_marginTop="92dp"
++                android:orientation="vertical">
++
++                <TextView
++                    android:id="@+id/mvRating"
++                    android:layout_width="wrap_content"
++                    android:layout_height="wrap_content"
++                    android:includeFontPadding="false"
++                    android:textColor="#FFFFFFFF"
++                    android:textSize="40sp"
++                    android:fontFamily="@font/ui"
++                    android:fontVariationSettings="'wght' 700, 'opsz' 28"
++                    android:letterSpacing="-0.02"
++                    android:shadowColor="#66000000"
++                    android:shadowRadius="6" />
++
++                <TextView
++                    android:id="@+id/mvVotes"
++                    android:layout_width="wrap_content"
++                    android:layout_height="wrap_content"
++                    android:layout_marginTop="2dp"
++                    android:textColor="#E6FFFFFF"
++                    android:textSize="12sp"
++                    android:fontFamily="@font/ui"
++                    android:fontVariationSettings="'wght' 500, 'opsz' 17" />
++
++                <LinearLayout
++                    android:id="@+id/mvCrew"
++                    android:layout_width="match_parent"
++                    android:layout_height="wrap_content"
++                    android:layout_marginTop="30dp"
++                    android:paddingStart="10dp"
++                    android:paddingEnd="10dp"
++                    android:paddingTop="8dp"
++                    android:paddingBottom="10dp"
++                    android:orientation="vertical"
++                    android:background="@drawable/mv_glass_card" />
++
++                <TextView
++                    android:id="@+id/mvFullCast"
++                    android:layout_width="match_parent"
++                    android:layout_height="24dp"
++                    android:layout_marginTop="7dp"
++                    android:gravity="center"
++                    android:includeFontPadding="false"
++                    android:background="@drawable/mv_glass_button"
++                    android:focusable="true"
++                    android:clickable="true"
++                    android:text="@string/mv_full_cast"
++                    android:textColor="@color/hero_btn_fg"
++                    android:textSize="10.5sp"
++                    android:fontFamily="@font/ui"
++                    android:fontVariationSettings="'wght' 500, 'opsz' 17"
++                    android:nextFocusUp="@+id/btnWifi" />
++            </LinearLayout>
++        </FrameLayout>
++
+         <LinearLayout
+             android:id="@+id/rows"
+             android:layout_width="match_parent"
+@@ -230,10 +456,22 @@
+             android:clipToPadding="false"
+             android:orientation="vertical">
+ 
++            <!-- 0 Similar movies (posters), 1 Your Apps, 2 Continue Watching, 3 Wishlist (posters), 4 All Apps.
++                 Empty rows are hidden. -->
+             <TextView
+-                android:id="@+id/row1Title"
++                android:id="@+id/row0Title"
+                 style="@style/HeroRowTitle" />
+ 
++            <androidx.recyclerview.widget.RecyclerView
++                android:id="@+id/row0"
++                style="@style/HeroRow"
++                android:layout_height="210dp" />
++
++            <TextView
++                android:id="@+id/row1Title"
++                style="@style/HeroRowTitle"
++                android:layout_marginTop="2dp" />
++
+             <androidx.recyclerview.widget.RecyclerView
+                 android:id="@+id/row1"
+                 style="@style/HeroRow" />
+@@ -254,6 +492,16 @@
+ 
+             <androidx.recyclerview.widget.RecyclerView
+                 android:id="@+id/row3"
++                style="@style/HeroRow"
++                android:layout_height="210dp" />
++
++            <TextView
++                android:id="@+id/row4Title"
++                style="@style/HeroRowTitle"
++                android:layout_marginTop="2dp" />
++
++            <androidx.recyclerview.widget.RecyclerView
++                android:id="@+id/row4"
+                 style="@style/HeroRow" />
+         </LinearLayout>
+     </FrameLayout>
+diff --git a/launcher/app/src/main/res/layout/item_hero_poster.xml b/launcher/app/src/main/res/layout/item_hero_poster.xml
+new file mode 100644
+index 0000000..52befb8
+--- /dev/null
++++ b/launcher/app/src/main/res/layout/item_hero_poster.xml
+@@ -0,0 +1,83 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!-- One title in Similar movies / Wishlist: a 2:3 poster, its name fading in under it on focus. -->
++<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
++    android:layout_width="124dp"
++    android:layout_height="match_parent"
++    android:clipChildren="false"
++    android:clipToPadding="false">
++
++    <FrameLayout
++        android:id="@+id/card"
++        android:layout_width="108dp"
++        android:layout_height="162dp"
++        android:layout_marginTop="10dp"
++        android:background="@drawable/hero_card_bg"
++        android:focusable="true"
++        android:clickable="true">
++
++        <ImageView
++            android:id="@+id/banner"
++            android:layout_width="match_parent"
++            android:layout_height="match_parent"
++            android:scaleType="centerCrop"
++            android:contentDescription="@null" />
++
++        <ImageView
++            android:id="@+id/icon"
++            android:layout_width="40dp"
++            android:layout_height="40dp"
++            android:layout_gravity="center"
++            android:layout_marginBottom="12dp"
++            android:visibility="gone"
++            android:contentDescription="@null" />
++
++        <TextView
++            android:id="@+id/label"
++            android:layout_width="match_parent"
++            android:layout_height="wrap_content"
++            android:layout_gravity="bottom"
++            android:paddingStart="8dp"
++            android:paddingEnd="8dp"
++            android:paddingBottom="7dp"
++            android:gravity="center"
++            android:singleLine="true"
++            android:ellipsize="end"
++            android:textColor="#FFFFFFFF"
++            android:textSize="11sp"
++            android:fontFamily="@font/ui"
++            android:fontVariationSettings="'wght' 500, 'opsz' 17"
++            android:visibility="gone" />
++
++        <!-- How far into a show you are (Continue Watching). -->
++        <FrameLayout
++            android:id="@+id/progressTrack"
++            android:layout_width="match_parent"
++            android:layout_height="3dp"
++            android:layout_gravity="bottom"
++            android:layout_marginStart="10dp"
++            android:layout_marginEnd="10dp"
++            android:layout_marginBottom="8dp"
++            android:background="@drawable/hero_progress_track"
++            android:visibility="gone">
++
++            <View
++                android:id="@+id/progressFill"
++                android:layout_width="0dp"
++                android:layout_height="match_parent"
++                android:background="@drawable/hero_progress_fill" />
++        </FrameLayout>
++    </FrameLayout>
++
++    <TextView
++        android:id="@+id/name"
++        android:layout_width="108dp"
++        android:layout_height="wrap_content"
++        android:layout_marginTop="180dp"
++        android:singleLine="true"
++        android:ellipsize="end"
++        android:alpha="0"
++        android:textColor="#F2FFFFFF"
++        android:textSize="11.5sp"
++        android:fontFamily="@font/ui"
++        android:fontVariationSettings="'wght' 500, 'opsz' 17" />
++</FrameLayout>
+diff --git a/launcher/app/src/main/res/values/strings.xml b/launcher/app/src/main/res/values/strings.xml
+index 4f27a28..367f56c 100644
+--- a/launcher/app/src/main/res/values/strings.xml
++++ b/launcher/app/src/main/res/values/strings.xml
+@@ -77,6 +77,19 @@
+     <string name="qp_bluetooth">Bluetooth</string>
+     <string name="qp_display_mode">Display mode</string>
+     <string name="qp_accessibility">Accessibility</string>
++    <string name="mv_watch_movie">Watch movie</string>
++    <string name="mv_watch_show">Watch show</string>
++    <string name="mv_add_wishlist">Add to wishlist</string>
++    <string name="mv_in_wishlist">In wishlist</string>
++    <string name="mv_full_cast">See full cast</string>
++    <string name="mv_less_cast">Show less</string>
++    <string name="mv_director">DIRECTOR</string>
++    <string name="mv_creator">CREATOR</string>
++    <string name="mv_cast">CAST</string>
++    <string name="mv_reviews">%1$s reviews</string>
++    <string name="mv_similar">Similar movies</string>
++    <string name="mv_similar_shows">Similar shows</string>
++    <string name="mv_wishlist">Wishlist</string>
+     <string name="menu_resume">Resume %1$s</string>
+     <string name="menu_open">Open %1$s</string>
+     <string name="menu_add_your_apps">Add to Your Apps</string>
+-- 
+2.54.0 (Apple Git-157)
+

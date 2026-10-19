@@ -421,6 +421,13 @@ final class HeroHome implements RowAdapter.Listener {
         long d = animate ? 380 : 0;
         DecelerateInterpolator ease = new DecelerateInterpolator(2f);
         page.animate().translationY(0f).setDuration(d).setInterpolator(ease).start();
+        // Rows faded out under the top bar while scrolled down come back.
+        for (int r = 0; r < ROWS; r++) {
+            rows[r].animate().cancel();
+            rowTitles[r].animate().cancel();
+            rows[r].setAlpha(1f);
+            rowTitles[r].setAlpha(1f);
+        }
         heroText.animate().alpha(1f).setDuration(d).withLayer().start();
         buttons.animate().alpha(1f).setDuration(d).withLayer().start();
         dots.animate().alpha(1f).setDuration(d).start();
