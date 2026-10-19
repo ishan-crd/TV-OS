@@ -36,13 +36,20 @@
         <item>KEYCODE_MACRO_4=</item>
     </string-array>
 
-    <!-- Hero home: the first row ("Your Apps"), in this order. Leave it empty for a "Recently Used" row. -->
+    <!-- Hero home: the first row ("Your Apps"), in this order. Leave it empty for a "Recently Used" row.
+         Long-press a card on the TV to edit this row and the featured carousel; edits on the TV win. -->
     <string-array name="your_apps">
         <item>in.startv.hotstar</item>
         <item>com.amazon.amazonvideo.livingroom</item>
         <item>com.netflix.ninja</item>
         <item>com.google.android.youtube.tv</item>
     </string-array>
+
+    <!-- Hero home at night: the artwork is darkened by this much between these hours (24 h clock).
+         Same start and end hour = off. -->
+    <integer name="night_start_hour">22</integer>
+    <integer name="night_end_hour">6</integer>
+    <integer name="night_dim_percent">40</integer>
 
     <!-- Apps never shown as tiles (e.g. the Live TV app, which the Inputs menu already covers). -->
     <string-array name="hidden_apps">

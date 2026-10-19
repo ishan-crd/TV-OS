@@ -12,12 +12,12 @@ import java.util.Random;
 
 /**
  * Screensaver: the launcher's thin clock and date on black, over a slow ambient glow.
- * Every minute the clock drifts to a new spot and the glow shifts colour, so nothing burns in.
+ * Every 30 seconds the clock drifts to a new spot and the glow shifts colour, so nothing burns in.
  * No network, no images: cheap enough for a 1 GB TV.
  */
 public class ClockDream extends DreamService {
 
-    private static final long MOVE_MS = 60_000L;
+    private static final long MOVE_MS = 30_000L;
     /** Deep, low-brightness glow colours; the glow is drawn at partial alpha on black. */
     private static final int[] PALETTE = {0xFF2B5CFF, 0xFF00A39A, 0xFF8A3FFC, 0xFFE0661B, 0xFFD6336C};
 

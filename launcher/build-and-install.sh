@@ -46,6 +46,7 @@ printf '%s\n' \
   "rm -f /data/local/tmp/tvhome.apk" \
   "pm grant com.gathin.tvhome android.permission.ACCESS_FINE_LOCATION 2>/dev/null; echo location-granted" \
   "appops set com.gathin.tvhome GET_USAGE_STATS allow; echo usage-access-granted" \
+  "pm grant com.gathin.tvhome android.permission.READ_TV_LISTINGS 2>/dev/null; echo watch-next-granted" \
   "cmd package compile -m speed -f com.gathin.tvhome" \
   "am start -W -n com.gathin.tvhome/.MainActivity | grep -E '^(Status|Error)'" \
   "$DISABLE_STOCK" \

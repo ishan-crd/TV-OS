@@ -69,7 +69,11 @@ final class HeroHome implements RowAdapter.Listener {
     /** Package whose backdrop should be on screen; late results for other packages are dropped. */
     private String wantBackdrop;
     private boolean frontIsB;
-    private AppAdapter.Entry pendingRowEntry;
+    private RowAdapter.Item pendingRowItem;
+    /** Apps on this TV by package, refreshed on resume. */
+    private final Map<String, AppAdapter.Entry> apps = new HashMap<>();
+    /** Extra darkening of the artwork at night (config.xml night_*), 0 by day. */
+    private float nightDim;
 
     private final Runnable autoAdvance = new Runnable() {
         @Override
@@ -79,7 +83,7 @@ final class HeroHome implements RowAdapter.Listener {
         }
     };
     private final Runnable rowBackdrop = () -> {
-        if (inRows && pendingRowEntry != null) showBackdrop(pendingRowEntry, true);
+        if (inRows && pendingRowItem != null) showItemBackdrop(pendingRowItem);
     };
 
     HeroHome(MainActivity act) {
@@ -148,51 +152,8 @@ final class HeroHome implements RowAdapter.Listener {
     // ---- lifecycle -------------------------------------------------------------------------------
 
     void onResume() {
-        List<AppAdapter.Entry> all = AppAdapter.loadApps(act);
-        lastUsed = readLastUsed();
-
-        List<String> dock = Arrays.asList(act.getResources().getStringArray(R.array.dock_apps));
-        slides.clear();
-        for (AppAdapter.Entry e : all) if (dock.contains(e.pkg)) slides.add(e);
-        if (slides.isEmpty()) slides.addAll(all.subList(0, Math.min(4, all.size())));
-
-        // Your Apps: the apps listed in config.xml your_apps, in that order; an empty list = recently used.
-        List<AppAdapter.Entry> first = new ArrayList<>();
-        for (String pkg : act.getResources().getStringArray(R.array.your_apps)) {
-            for (AppAdapter.Entry e : all) if (e.pkg.equals(pkg.trim())) first.add(e);
-        }
-        if (!first.isEmpty()) {
-            rowTitles[0].setText(R.string.hero_your_apps);
-        } else {
-            for (AppAdapter.Entry e : all) if (lastUsed.containsKey(e.pkg)) first.add(e);
-            first.sort((a, b) -> Long.compare(lastUsed.get(b.pkg), lastUsed.get(a.pkg)));
-            if (first.size() > 12) first = first.subList(0, 12);
-            rowTitles[0].setText(first.isEmpty() ? R.string.hero_favourites : R.string.hero_recent);
-            if (first.isEmpty()) first = slides;
-        }
-        setRow(0, first, null);
-
-        // Continue Watching: video and music apps used in the last week, most recent first. Android keeps
-        // the actual shows ("Watch Next") from launchers that aren't part of the system image, so the
-        // row works per app; each app opens on its own continue-watching list.
-        long weekAgo = System.currentTimeMillis() - 7L * 24 * 3600 * 1000;
-        List<AppAdapter.Entry> watching = new ArrayList<>();
-        Map<String, String> when = new HashMap<>();
-        for (AppAdapter.Entry e : all) {
-            Long t = lastUsed.get(e.pkg);
-            if (t == null || t < weekAgo || !isWatchApp(e.pkg)) continue;
-            watching.add(e);
-            when.put(e.pkg, recency(e.pkg));
-        }
-        watching.sort((a, b) -> Long.compare(lastUsed.get(b.pkg), lastUsed.get(a.pkg)));
-        rowTitles[1].setText(R.string.hero_continue);
-        setRow(1, watching, when);
-
-        List<AppAdapter.Entry> alpha = new ArrayList<>(all);
-        alpha.sort((a, b) -> a.label.compareToIgnoreCase(b.label));
-        rowTitles[2].setText(R.string.hero_all_apps);
-        setRow(2, alpha, null);
-
+        buildRows();
+        updateNightDim(false);
         texts.clear();
         logos.clear();
         for (AppAdapter.Entry e : slides) {
@@ -220,6 +181,64 @@ final class HeroHome implements RowAdapter.Listener {
         }
         handler.removeCallbacks(autoAdvance);
         handler.postDelayed(autoAdvance, AUTO_ADVANCE_MS);
+    }
+
+    /** Reads the apps, the lists edited on the TV and Watch Next, and fills the carousel and rows. */
+    private void buildRows() {
+        List<AppAdapter.Entry> all = AppAdapter.loadApps(act);
+        lastUsed = readLastUsed();
+        apps.clear();
+        for (AppAdapter.Entry e : all) apps.put(e.pkg, e);
+
+        slides.clear();
+        for (String pkg : Prefs.list(act, Prefs.FEATURED)) if (apps.containsKey(pkg)) slides.add(apps.get(pkg));
+        if (slides.isEmpty()) slides.addAll(all.subList(0, Math.min(4, all.size())));
+
+        // Your Apps: the list edited on the TV (or config.xml your_apps); an empty list = recently used.
+        List<RowAdapter.Item> first = new ArrayList<>();
+        for (String pkg : Prefs.list(act, Prefs.YOUR_APPS)) if (apps.containsKey(pkg)) first.add(new RowAdapter.Item(apps.get(pkg), null));
+        if (!first.isEmpty()) {
+            rowTitles[0].setText(R.string.hero_your_apps);
+        } else {
+            List<AppAdapter.Entry> recent = new ArrayList<>();
+            for (AppAdapter.Entry e : all) if (lastUsed.containsKey(e.pkg)) recent.add(e);
+            recent.sort((a, b) -> Long.compare(lastUsed.get(b.pkg), lastUsed.get(a.pkg)));
+            for (AppAdapter.Entry e : recent.subList(0, Math.min(12, recent.size()))) first.add(new RowAdapter.Item(e, null));
+            rowTitles[0].setText(first.isEmpty() ? R.string.hero_favourites : R.string.hero_recent);
+            if (first.isEmpty()) for (AppAdapter.Entry e : slides) first.add(new RowAdapter.Item(e, null));
+        }
+        setRow(0, first);
+
+        // Continue Watching: the shows apps report to Android TV's Watch Next list (needs READ_TV_LISTINGS).
+        // Without it, or with nothing reported, the video apps used in the last week, most recent first.
+        List<RowAdapter.Item> watching = new ArrayList<>();
+        for (WatchNext.Program p : WatchNext.load(act, apps.keySet(), 20)) {
+            watching.add(new RowAdapter.Item(p, apps.get(p.pkg)));
+        }
+        if (watching.isEmpty()) {
+            long weekAgo = System.currentTimeMillis() - 7L * 24 * 3600 * 1000;
+            List<AppAdapter.Entry> used = new ArrayList<>();
+            for (AppAdapter.Entry e : all) {
+                Long t = lastUsed.get(e.pkg);
+                if (t != null && t >= weekAgo && isWatchApp(e.pkg)) used.add(e);
+            }
+            used.sort((a, b) -> Long.compare(lastUsed.get(b.pkg), lastUsed.get(a.pkg)));
+            for (AppAdapter.Entry e : used) watching.add(new RowAdapter.Item(e, recency(e.pkg)));
+        }
+        rowTitles[1].setText(R.string.hero_continue);
+        setRow(1, watching);
+
+        List<AppAdapter.Entry> alpha = new ArrayList<>(all);
+        alpha.sort((a, b) -> a.label.compareToIgnoreCase(b.label));
+        List<RowAdapter.Item> allItems = new ArrayList<>();
+        for (AppAdapter.Entry e : alpha) allItems.add(new RowAdapter.Item(e, null));
+        rowTitles[2].setText(R.string.hero_all_apps);
+        setRow(2, allItems);
+    }
+
+    /** Called every minute by MainActivity. */
+    void onMinute() {
+        updateNightDim(true);
     }
 
     void onPause() {
@@ -327,8 +346,27 @@ final class HeroHome implements RowAdapter.Listener {
     private void showBackdrop(AppAdapter.Entry e, boolean animate) {
         if (e.pkg.equals(wantBackdrop)) return;
         wantBackdrop = e.pkg;
-        backdrops.get(e, (pkg, bmp) -> {
-            if (pkg.equals(wantBackdrop)) crossfade(bmp, animate);
+        backdrops.get(e, (key, bmp) -> {
+            if (key.equals(wantBackdrop) && bmp != null) crossfade(bmp, animate);
+        });
+    }
+
+    /** A show's poster full screen; its app's backdrop when there is no poster or it won't load. */
+    private void showItemBackdrop(RowAdapter.Item it) {
+        if (it.show == null || it.show.posterUri == null) {
+            if (it.app != null) showBackdrop(it.app, true);
+            return;
+        }
+        String want = "img:" + it.show.posterUri;
+        if (want.equals(wantBackdrop)) return;
+        wantBackdrop = want;
+        backdrops.getImage(it.show.posterUri, (key, bmp) -> {
+            if (!key.equals(wantBackdrop)) return;
+            if (bmp != null) crossfade(bmp, true);
+            else if (it.app != null) {
+                wantBackdrop = null;
+                showBackdrop(it.app, true);
+            }
         });
     }
 
@@ -376,8 +414,7 @@ final class HeroHome implements RowAdapter.Listener {
         heroText.animate().alpha(0f).setDuration(d / 2).withLayer().start();
         buttons.animate().alpha(0f).setDuration(d / 2).withLayer().start();
         dots.animate().alpha(0f).setDuration(d / 2).start();
-        dim.setVisibility(View.VISIBLE);
-        dim.animate().alpha(0.5f).setDuration(d).withEndAction(null).start();
+        applyDim(d);
     }
 
     private void exitRows(boolean animate) {
@@ -390,7 +427,7 @@ final class HeroHome implements RowAdapter.Listener {
         heroText.animate().alpha(1f).setDuration(d).withLayer().start();
         buttons.animate().alpha(1f).setDuration(d).withLayer().start();
         dots.animate().alpha(1f).setDuration(d).start();
-        dim.animate().alpha(0f).setDuration(d).withEndAction(() -> dim.setVisibility(View.GONE)).start();
+        applyDim(d);
         if (!slides.isEmpty()) showBackdrop(slides.get(slide), animate);
         btnOpen.requestFocus();
         handler.removeCallbacks(autoAdvance);
@@ -440,13 +477,13 @@ final class HeroHome implements RowAdapter.Listener {
     }
 
     @Override
-    public void onCardFocused(int row, int position, AppAdapter.Entry e) {
+    public void onCardFocused(int row, int position, RowAdapter.Item e) {
         if (!inRows) enterRows(true);
         scrollPageTo(row, true);
         lastRow = row;
         lastRowPos = position;
         // The backdrop follows the focused card, after a short pause so racing along a row stays cheap.
-        pendingRowEntry = e;
+        pendingRowItem = e;
         handler.removeCallbacks(rowBackdrop);
         handler.postDelayed(rowBackdrop, ROW_BACKDROP_DELAY_MS);
     }
@@ -484,8 +521,8 @@ final class HeroHome implements RowAdapter.Listener {
         return loc[0] + card.getWidth() / 2f;
     }
 
-    private void setRow(int row, List<AppAdapter.Entry> items, Map<String, String> captions) {
-        adapters[row].setItems(items, captions);
+    private void setRow(int row, List<RowAdapter.Item> items) {
+        adapters[row].setItems(items);
         int v = items.isEmpty() ? View.GONE : View.VISIBLE;
         rows[row].setVisibility(v);
         rowTitles[row].setVisibility(v);
@@ -536,13 +573,71 @@ final class HeroHome implements RowAdapter.Listener {
     }
 
     @Override
-    public void onCardClick(AppAdapter.Entry e) {
-        AppAdapter.launch(act, e);
+    public void onCardClick(RowAdapter.Item it) {
+        if (it.show != null) WatchNext.open(act, it.show, it.app);
+        else AppAdapter.launch(act, it.app);
     }
 
     @Override
-    public void onCardLongClick(AppAdapter.Entry e) {
-        AppAdapter.openAppInfo(act, e);
+    public void onCardLongClick(RowAdapter.Item it, View card) {
+        if (it.app != null) CardMenu.show(act, card, it, this::onMenuChanged);
+    }
+
+    /** After an edit from the card menu: rebuild, and keep focus on the same card in the same row. */
+    private void onMenuChanged(String focusKey) {
+        int row = lastRow;
+        buildRows();
+        dots.setCount(slides.size());
+        int i = 0;
+        for (int k = 0; k < slides.size(); k++) if (slides.get(k).pkg.equals(lastSlidePkg)) i = k;
+        slide = -1;
+        texts.clear();
+        for (AppAdapter.Entry e : slides) {
+            texts.put(e.pkg, new String[]{
+                    act.getString(R.string.hero_app) + " · " + category(e.pkg), recency(e.pkg), tagline(e.pkg)});
+        }
+        showSlide(i, 0);
+        if (row < 0 || row >= ROWS) return;
+        int r = row, pos = adapters[row].positionOf(focusKey);
+        if (pos < 0) {
+            r = row == 0 ? (adapters[0].getItemCount() > 0 ? 0 : nextRow(0, 1)) : row;
+            pos = 0;
+        }
+        if (r < 0) {
+            exitRows(true);
+            return;
+        }
+        final int fr = r, fp = pos;
+        rows[fr].post(() -> {
+            scrollPageTo(fr, false);
+            focusCard(fr, fp);
+        });
+    }
+
+    // ---- night -----------------------------------------------------------------------------------
+
+    private void updateNightDim(boolean animate) {
+        int start = act.getResources().getInteger(R.integer.night_start_hour);
+        int end = act.getResources().getInteger(R.integer.night_end_hour);
+        int pct = act.getResources().getInteger(R.integer.night_dim_percent);
+        int h = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY);
+        boolean night = start == end ? false : start < end ? (h >= start && h < end) : (h >= start || h < end);
+        float want = night ? Math.max(0, Math.min(90, pct)) / 100f : 0f;
+        if (want == nightDim) return;
+        nightDim = want;
+        applyDim(animate ? 1200 : 0);
+    }
+
+    /** The dim layer over the artwork: the night setting, or half while the rows are up, whichever is darker. */
+    private void applyDim(long duration) {
+        float target = Math.max(nightDim, inRows ? 0.5f : 0f);
+        dim.animate().cancel();
+        if (target > 0f) {
+            dim.setVisibility(View.VISIBLE);
+            dim.animate().alpha(target).setDuration(duration).withEndAction(null).start();
+        } else {
+            dim.animate().alpha(0f).setDuration(duration).withEndAction(() -> dim.setVisibility(View.GONE)).start();
+        }
     }
 
     // ---- text ------------------------------------------------------------------------------------

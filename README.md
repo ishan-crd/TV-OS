@@ -8,7 +8,8 @@ back with one command.
 
 It grew out of [tv-vibehack](https://github.com/Gathin23/tv-vibehack) by Gathin (MIT), whose launcher,
 install tools and debloat approach it builds on. The home screen design is inspired by
-[Rivulet](https://github.com/l984-451/Rivulet)'s Apple TV app (design only, no code from it).
+[Rivulet](https://github.com/l984-451/Rivulet)'s Apple TV app, and a few features by
+[Arc Launcher](https://github.com/meddouribadis/arclauncher) (ideas only; no code from either).
 
 ## What it looks like
 
@@ -19,8 +20,16 @@ install tools and debloat approach it builds on. The home screen design is inspi
   next buttons, and page dots. It advances every 9 seconds.
 - **Rows** that slide up when you press Down:
   - **Your Apps**: the apps you pick, in your order.
-  - **Continue Watching**: the video and music apps you've used in the last week, most recent first.
+  - **Continue Watching**: the films and episodes you're part-way through, with posters and a progress
+    bar, from Android TV's Watch Next list; OK resumes it in its app. Focusing one puts its poster full
+    screen behind the rows. Which apps report there is up to them: on Google TV, JioHotstar and Prime
+    Video do, Netflix and YouTube don't. Without anything reported, the row lists the video apps you used
+    in the last week.
   - **All Apps**.
+- **Long-press any card** to edit from the sofa: add to or remove from Your Apps, move left or right, add
+  to or remove from the featured carousel, resume a show, or open the app's info.
+- **Night mode**: from 22:00 to 06:00 the artwork is dimmed (`night_*` in config.xml).
+- **Clock screensaver** that drifts every 30 seconds so nothing burns in.
 - **Top bar**: a Home pill, the clock, and glass pills for **Inputs** (HDMI, AV, Live TV), **Wi-Fi**
   (shows the network name) and **Settings**.
 - The backdrop follows the focused card; rows that scroll under the top bar fade out; Back returns
@@ -29,8 +38,9 @@ install tools and debloat approach it builds on. The home screen design is inspi
 **Classic home** (`hero_home` false): pitch black, a dock of four apps, a 4-column grid and one glass
 highlight that springs between tiles.
 
-Built for TVs with 1-2 GB of RAM: no blur, no video, no network. Backdrops are built off the main thread
-and cached; on a MediaTek Google TV 14 set it renders at a median 24 ms per frame (the classic home: 23 ms).
+Built for TVs with 1-2 GB of RAM: no blur, no video. The only network use is fetching show posters, which
+are cached on disk. Backdrops and posters are built off the main thread and cached; on a MediaTek Google
+TV 14 set at 60 Hz it renders at a median 24 ms per frame (the classic home: 23 ms).
 
 ## Install
 
@@ -52,7 +62,12 @@ You need a computer on the same network as the TV, Python 3, JDK 17 and the Andr
    TV_HOST=$TV_HOST JAVA_HOME=/path/to/jdk17 INPUT_KEY_SERVICE=1 ./build-and-install.sh
    ```
    The script installs the launcher, sets it as Home, disables the stock launcher it recognises, grants
-   usage access (for Continue Watching) and, with `INPUT_KEY_SERVICE=1`, turns on the remote-key service.
+   usage access and `READ_TV_LISTINGS` (for Continue Watching) and, with `INPUT_KEY_SERVICE=1`, turns on
+   the remote-key service.
+5. **Optional screensaver**:
+   ```bash
+   tools/venv/bin/python -I tools/tv.py 'settings put secure screensaver_components com.gathin.tvhome/.ClockDream; settings put secure screensaver_enabled 1'
+   ```
 
 Undo everything: `tools/restore.sh devices/<your tv>/debloat.txt com.google.android.apps.tv.launcherx`.
 
@@ -63,8 +78,9 @@ Everything per TV lives in [`launcher/app/src/main/res/values/config.xml`](launc
 | Setting | What it does |
 |---|---|
 | `hero_home` | Hero home (true) or classic home (false) |
-| `dock_apps` | The featured carousel (and the classic dock), in order |
-| `your_apps` | The "Your Apps" row; empty = a "Recently Used" row |
+| `dock_apps` | The featured carousel (and the classic dock), in order. Edits made on the TV win |
+| `your_apps` | The "Your Apps" row; empty = a "Recently Used" row. Edits made on the TV win |
+| `night_start_hour`, `night_end_hour`, `night_dim_percent` | Night dimming of the artwork |
 | `hidden_apps` | Apps never shown |
 | `live_tv_package` | The TV's Live TV app, offered in the Inputs menu |
 | `remote_app_keys` | Remote buttons the key service takes over (see below) |

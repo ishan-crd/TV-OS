@@ -15,29 +15,52 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
-/** One horizontal row of app cards on the hero home. */
+/** One horizontal row of cards on the hero home: apps, or shows from Watch Next. */
 final class RowAdapter extends RecyclerView.Adapter<RowAdapter.Holder> {
 
+    /** A card: an app, or a show (with the app that plays it). */
+    static final class Item {
+        final String key;
+        final String title;
+        /** Shown after the title under a focused card, e.g. "Today" or the app's name; may be null. */
+        final String caption;
+        final AppAdapter.Entry app;
+        final WatchNext.Program show;
+
+        Item(AppAdapter.Entry app, String caption) {
+            this.key = app.component.flattenToShortString();
+            this.title = app.label;
+            this.caption = caption;
+            this.app = app;
+            this.show = null;
+        }
+
+        Item(WatchNext.Program show, AppAdapter.Entry app) {
+            this.key = show.key();
+            this.title = show.title;
+            this.caption = show.episode != null ? show.episode : app != null ? app.label : null;
+            this.app = app;
+            this.show = show;
+        }
+    }
+
     interface Listener {
-        void onCardFocused(int row, int position, AppAdapter.Entry e);
+        void onCardFocused(int row, int position, Item item);
 
         /** A D-pad key on a card. Return true when handled. */
         boolean onCardKey(int row, int position, int keyCode);
 
-        void onCardClick(AppAdapter.Entry e);
+        void onCardClick(Item item);
 
-        void onCardLongClick(AppAdapter.Entry e);
+        void onCardLongClick(Item item, View card);
     }
 
     static final float FOCUS_SCALE = 1.1f;
 
     private final int row;
     private final Listener listener;
-    private final List<AppAdapter.Entry> items = new ArrayList<>();
-    /** Optional text after the app name under a focused card, e.g. "Today"; keyed by package. */
-    private Map<String, String> captions;
+    private final List<Item> items = new ArrayList<>();
 
     RowAdapter(int row, Listener listener) {
         this.row = row;
@@ -45,15 +68,19 @@ final class RowAdapter extends RecyclerView.Adapter<RowAdapter.Holder> {
         setHasStableIds(true);
     }
 
-    void setItems(List<AppAdapter.Entry> list, Map<String, String> captions) {
-        this.captions = captions;
+    void setItems(List<Item> list) {
         items.clear();
         items.addAll(list);
         notifyDataSetChanged();
     }
 
-    AppAdapter.Entry itemAt(int position) {
+    Item itemAt(int position) {
         return position >= 0 && position < items.size() ? items.get(position) : null;
+    }
+
+    int positionOf(String key) {
+        for (int i = 0; i < items.size(); i++) if (items.get(i).key.equals(key)) return i;
+        return -1;
     }
 
     @Override
@@ -63,7 +90,7 @@ final class RowAdapter extends RecyclerView.Adapter<RowAdapter.Holder> {
 
     @Override
     public long getItemId(int position) {
-        return items.get(position).component.flattenToShortString().hashCode();
+        return items.get(position).key.hashCode();
     }
 
     @NonNull
@@ -74,37 +101,68 @@ final class RowAdapter extends RecyclerView.Adapter<RowAdapter.Holder> {
 
     @Override
     public void onBindViewHolder(@NonNull Holder h, int position) {
-        AppAdapter.Entry e = items.get(position);
-        String caption = captions == null ? null : captions.get(e.pkg);
-        h.name.setText(caption == null ? e.label : e.label + " · " + caption);
+        Item it = items.get(position);
+        h.boundKey = it.key;
+        h.name.setText(it.caption == null ? it.title : it.title + " · " + it.caption);
         boolean focused = h.card.isFocused();
         h.name.setAlpha(focused ? 1f : 0f);
         h.card.setScaleX(focused ? FOCUS_SCALE : 1f);
         h.card.setScaleY(focused ? FOCUS_SCALE : 1f);
-        if (e.banner != null) {
-            h.banner.setImageDrawable(e.banner);
-            h.banner.setVisibility(View.VISIBLE);
-            h.icon.setVisibility(View.GONE);
-            h.label.setVisibility(View.GONE);
-        } else {
+
+        if (it.show != null) {
+            // Poster, loaded in the background; the app's icon and the title stand in until it arrives.
             h.banner.setImageDrawable(null);
-            h.banner.setVisibility(View.GONE);
-            h.icon.setImageDrawable(e.icon);
-            h.icon.setVisibility(View.VISIBLE);
-            h.label.setText(e.label);
-            h.label.setVisibility(View.VISIBLE);
+            h.banner.setVisibility(View.VISIBLE);
+            showFallback(h, it.app != null ? it.app.icon : null, it.title);
+            final String key = it.key;
+            Posters.get(h.itemView.getContext()).load(it.show.posterUri, (uri, bmp) -> {
+                if (bmp == null || !key.equals(h.boundKey)) return;
+                h.banner.setImageBitmap(bmp);
+                h.icon.setVisibility(View.GONE);
+                h.label.setVisibility(View.GONE);
+            });
+            if (it.show.progress > 0.02f) {
+                h.progressTrack.setVisibility(View.VISIBLE);
+                h.progressTrack.post(() -> {
+                    ViewGroup.LayoutParams lp = h.progressFill.getLayoutParams();
+                    lp.width = Math.round(h.progressTrack.getWidth() * it.show.progress);
+                    h.progressFill.setLayoutParams(lp);
+                });
+            } else {
+                h.progressTrack.setVisibility(View.GONE);
+            }
+        } else {
+            h.progressTrack.setVisibility(View.GONE);
+            if (it.app.banner != null) {
+                h.banner.setImageDrawable(it.app.banner);
+                h.banner.setVisibility(View.VISIBLE);
+                h.icon.setVisibility(View.GONE);
+                h.label.setVisibility(View.GONE);
+            } else {
+                h.banner.setImageDrawable(null);
+                h.banner.setVisibility(View.GONE);
+                showFallback(h, it.app.icon, it.app.label);
+            }
         }
-        h.card.setOnClickListener(v -> listener.onCardClick(e));
+        h.card.setOnClickListener(v -> listener.onCardClick(it));
         h.card.setOnLongClickListener(v -> {
-            listener.onCardLongClick(e);
+            listener.onCardLongClick(it, v);
             return true;
         });
     }
 
+    private static void showFallback(Holder h, android.graphics.drawable.Drawable icon, String text) {
+        h.icon.setImageDrawable(icon);
+        h.icon.setVisibility(icon == null ? View.GONE : View.VISIBLE);
+        h.label.setText(text);
+        h.label.setVisibility(View.VISIBLE);
+    }
+
     final class Holder extends RecyclerView.ViewHolder {
-        final View card;
+        final View card, progressTrack, progressFill;
         final ImageView banner, icon;
         final TextView label, name;
+        String boundKey;
 
         Holder(View v) {
             super(v);
@@ -113,6 +171,8 @@ final class RowAdapter extends RecyclerView.Adapter<RowAdapter.Holder> {
             icon = v.findViewById(R.id.icon);
             label = v.findViewById(R.id.label);
             name = v.findViewById(R.id.name);
+            progressTrack = v.findViewById(R.id.progressTrack);
+            progressFill = v.findViewById(R.id.progressFill);
             final float density = v.getResources().getDisplayMetrics().density;
             card.setOutlineProvider(new ViewOutlineProvider() {
                 @Override

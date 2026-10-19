@@ -47,6 +47,25 @@
             android:fontFamily="@font/ui"
             android:fontVariationSettings="'wght' 500, 'opsz' 17"
             android:visibility="gone" />
+
+        <!-- How far into a show you are (Continue Watching). -->
+        <FrameLayout
+            android:id="@+id/progressTrack"
+            android:layout_width="match_parent"
+            android:layout_height="3dp"
+            android:layout_gravity="bottom"
+            android:layout_marginStart="10dp"
+            android:layout_marginEnd="10dp"
+            android:layout_marginBottom="8dp"
+            android:background="@drawable/hero_progress_track"
+            android:visibility="gone">
+
+            <View
+                android:id="@+id/progressFill"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:background="@drawable/hero_progress_fill" />
+        </FrameLayout>
     </FrameLayout>
 
     <TextView

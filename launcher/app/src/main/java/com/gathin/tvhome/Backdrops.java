@@ -53,32 +53,58 @@ final class Backdrops {
         this.ctx = ctx.getApplicationContext();
     }
 
-    /** Main thread. Calls back immediately when cached, otherwise once built. */
+    /** Main thread. Calls back immediately when cached, otherwise once built. Keyed by package. */
     void get(AppAdapter.Entry e, Callback cb) {
-        Bitmap b = cache.get(e.pkg);
-        if (b != null) {
-            cb.onReady(e.pkg, b);
-            return;
-        }
-        boolean running = pending.containsKey(e.pkg);
-        pending.put(e.pkg, cb);       // only the latest caller for a package is told
-        if (running) return;
         final Drawable art = e.banner != null ? e.banner : e.icon;
         final Drawable copy = art == null ? null
                 : art.getConstantState() != null ? art.getConstantState().newDrawable().mutate() : art;
         final String pkg = e.pkg;
+        request(pkg, cb, () -> make(pkg, copy));
+    }
+
+    /**
+     * A show's poster as the backdrop, Rivulet style: the artwork full screen under the scrim. Keyed by
+     * "img:" + uri; the callback gets null when the image can't be loaded.
+     */
+    void getImage(String uri, Callback cb) {
+        request("img:" + uri, cb, () -> {
+            Bitmap src = Posters.get(ctx).decode(uri, W, H);
+            if (src == null) return null;
+            Bitmap out = Bitmap.createBitmap(W, H, Bitmap.Config.ARGB_8888);
+            Canvas c = new Canvas(out);
+            c.drawColor(Color.BLACK);
+            drawCover(new android.graphics.drawable.BitmapDrawable(ctx.getResources(), src), c, W, H);
+            src.recycle();
+            scrim(c, W, H);
+            return out;
+        });
+    }
+
+    private interface Maker {
+        Bitmap make();
+    }
+
+    private void request(String key, Callback cb, Maker maker) {
+        Bitmap b = cache.get(key);
+        if (b != null) {
+            cb.onReady(key, b);
+            return;
+        }
+        boolean running = pending.containsKey(key);
+        pending.put(key, cb);       // only the latest caller for a key is told
+        if (running) return;
         worker.execute(() -> {
             Bitmap made;
             try {
-                made = make(pkg, copy);
+                made = maker.make();
             } catch (Throwable t) {
-                made = Bitmap.createBitmap(4, 4, Bitmap.Config.ARGB_8888);
+                made = null;
             }
             final Bitmap result = made;
             main.post(() -> {
-                cache.put(pkg, result);
-                Callback c = pending.remove(pkg);
-                if (c != null) c.onReady(pkg, result);
+                if (result != null) cache.put(key, result);
+                Callback c = pending.remove(key);
+                if (c != null) c.onReady(key, result);
             });
         });
     }

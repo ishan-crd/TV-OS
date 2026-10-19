@@ -12,6 +12,10 @@
     <!-- Needed on Android 10 to read the Wi-Fi network name; granted over adb at install time. -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <!-- Hero home's "Recently Used" row and "Today" badge; granted over adb (appops) at install time. -->
+    <!-- Continue Watching: Android TV's Watch Next list; a runtime permission, granted over adb at install. -->
+    <uses-permission android:name="android.permission.READ_TV_LISTINGS" />
+    <!-- Show posters in Continue Watching are web images. -->
+    <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS"
         tools:ignore="ProtectedPermissions" />
 

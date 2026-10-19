@@ -133,6 +133,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         public void run() {
             updateGreeting();
             updateWifiLabel();
+            if (hero != null) hero.onMinute();
             handler.postDelayed(this, MINUTE_MS);
         }
     };

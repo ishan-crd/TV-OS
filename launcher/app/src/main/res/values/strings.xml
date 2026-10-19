@@ -48,4 +48,12 @@
     <string name="cat_maps">Maps</string>
     <string name="cat_productivity">Productivity</string>
     <string name="cat_tv">TV</string>
+    <string name="menu_resume">Resume %1$s</string>
+    <string name="menu_open">Open %1$s</string>
+    <string name="menu_add_your_apps">Add to Your Apps</string>
+    <string name="menu_remove_your_apps">Remove from Your Apps</string>
+    <string name="menu_move_left">Move left</string>
+    <string name="menu_move_right">Move right</string>
+    <string name="menu_add_featured">Add to Featured</string>
+    <string name="menu_remove_featured">Remove from Featured</string>
 </resources>
