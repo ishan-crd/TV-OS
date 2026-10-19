@@ -34,7 +34,7 @@ import java.util.Map;
 final class HeroHome implements RowAdapter.Listener {
 
     private static final long AUTO_ADVANCE_MS = 9000;
-    private static final long ROW_BACKDROP_DELAY_MS = 220;
+    private static final long ROW_BACKDROP_DELAY_MS = 110;
     /** How far the page slides up when the rows take focus. */
     private static final float ROWS_SHIFT_DP = 456 - 232;   // first row title from 456 dp to FOCUSED_ROW_Y_DP
 
@@ -354,10 +354,11 @@ final class HeroHome implements RowAdapter.Listener {
             if (it.app != null) showBackdrop(it.app, true);
             return;
         }
-        String want = "img:" + it.show.posterUri;
+        String uri = hd(it.show.posterUri);
+        String want = "img:" + uri;
         if (want.equals(wantBackdrop)) return;
         wantBackdrop = want;
-        backdrops.getImage(it.show.posterUri, (key, bmp) -> {
+        backdrops.getImage(uri, (key, bmp) -> {
             if (!key.equals(wantBackdrop)) return;
             if (bmp != null) crossfade(bmp, true);
             else if (it.app != null) {
@@ -369,7 +370,7 @@ final class HeroHome implements RowAdapter.Listener {
 
     /** Two stacked images: the new one fades in on top, or the top one fades out over it. */
     private void crossfade(Bitmap bmp, boolean animate) {
-        long d = animate ? 450 : 0;
+        long d = animate ? 280 : 0;
         backA.animate().cancel();
         backB.animate().cancel();
         // Both are drawn only while fading; afterwards the hidden one is INVISIBLE, so a still screen
@@ -490,6 +491,11 @@ final class HeroHome implements RowAdapter.Listener {
         pendingRowItem = e;
         handler.removeCallbacks(rowBackdrop);
         handler.postDelayed(rowBackdrop, ROW_BACKDROP_DELAY_MS);
+        // The neighbours' art in advance, so moving left or right shows it at once.
+        for (int d : new int[]{1, -1, 2}) {
+            RowAdapter.Item n = adapters[row].itemAt(position + d);
+            if (n != null && n.show != null && n.show.posterUri != null) backdrops.preloadImage(hd(n.show.posterUri));
+        }
     }
 
     @Override
@@ -561,6 +567,15 @@ final class HeroHome implements RowAdapter.Listener {
         if (Math.abs(page.getTranslationY() - y) < 1f) return;
         page.animate().translationY(y).setDuration(animate ? 360 : 0)
                 .setInterpolator(new DecelerateInterpolator(2f)).start();
+    }
+
+    /**
+     * The larger version of an app's artwork where its image server takes a width in the address
+     * (JioHotstar asks for w_544; the same picture comes at any width).
+     */
+    private static String hd(String uri) {
+        if (uri == null) return null;
+        return uri.contains("hotstarext.com") ? uri.replaceAll("([/,])w_\\d+", "$1w_1280") : uri;
     }
 
     /** Apps you watch or listen in: declared video/music apps, the well-known streaming ones and Live TV. */

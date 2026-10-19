@@ -37,12 +37,15 @@ final class Backdrops {
 
     /** Half the 1080p screen: the ImageView scales it up, banners have no more detail than this anyway. */
     private static final int W = 960, H = 540;
+    /** Photo backdrops (show art) are kept sharper: 2/3 of 1080p, upscaled 1.5x by the ImageView. */
+    private static final int PW = 1280, PH = 720;
 
     private final Context ctx;
     // Six 960x540 ARGB backdrops are about 12 MB. (RGB_565 halves that but bands the glows.)
     private final LruCache<String, Bitmap> cache = new LruCache<>(6);
     private final Map<String, Callback> pending = new HashMap<>();
-    private final ExecutorService worker = Executors.newSingleThreadExecutor(r -> {
+    // Two threads: the backdrop asked for now isn't stuck behind a neighbour being prepared in advance.
+    private final ExecutorService worker = Executors.newFixedThreadPool(2, r -> {
         Thread t = new Thread(r, "backdrops");
         t.setPriority(Thread.MIN_PRIORITY);
         return t;
@@ -68,14 +71,15 @@ final class Backdrops {
      */
     void getImage(String uri, Callback cb) {
         request("img:" + uri, cb, () -> {
-            Bitmap src = Posters.get(ctx).decode(uri, W, H);
+            Bitmap src = Posters.get(ctx).decode(uri, PW, PH);
+
             if (src == null) return null;
-            Bitmap out = Bitmap.createBitmap(W, H, Bitmap.Config.ARGB_8888);
+            Bitmap out = Bitmap.createBitmap(PW, PH, Bitmap.Config.ARGB_8888);
             Canvas c = new Canvas(out);
             c.drawColor(Color.BLACK);
-            drawCover(new android.graphics.drawable.BitmapDrawable(ctx.getResources(), src), c, W, H);
+            drawCover(new android.graphics.drawable.BitmapDrawable(ctx.getResources(), src), c, PW, PH);
             src.recycle();
-            scrim(c, W, H);
+            scrim(c, PW, PH);
             return out;
         });
     }
@@ -107,6 +111,13 @@ final class Backdrops {
                 if (c != null) c.onReady(key, result);
             });
         });
+    }
+
+    /** Builds an image backdrop in the background so a later getImage() is instant. */
+    void preloadImage(String uri) {
+        if (uri == null) return;
+        String key = "img:" + uri;
+        if (cache.get(key) == null && !pending.containsKey(key)) getImage(uri, (k, b) -> { });
     }
 
     /** Builds it in the background so a later get() is instant. */
