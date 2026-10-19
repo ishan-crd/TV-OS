@@ -54,11 +54,20 @@ public class QuickPanelActivity extends Activity {
                 {R.drawable.ic_wifi, R.string.wifi, networkName(),
                         (Action) () -> go(new Intent(Settings.ACTION_WIFI_SETTINGS))},
                 {R.drawable.ic_qp_bluetooth, R.string.qp_bluetooth, null,
-                        // Android TV's own "Remotes & Accessories" page (Bluetooth on/off, pair, devices). Settings
-                        // won't open it for other apps, so the remote-key service selects it in Settings.
+                        // Android TV's own "Remotes & Accessories" page (Bluetooth on/off, pair, devices), opened
+                        // directly as Google TV's panel does. Settings only shows it to holders of
+                        // WRITE_SECURE_SETTINGS (granted over adb at install); without it, the remote-key service
+                        // selects the entry inside Settings instead.
                         (Action) () -> {
-                            if (InputKeyService.openSettingsEntry(this, "Remotes")) finish();
-                            else go(new Intent(Settings.ACTION_BLUETOOTH_SETTINGS), new Intent(Settings.ACTION_SETTINGS));
+                            if (checkSelfPermission("android.permission.WRITE_SECURE_SETTINGS")
+                                    == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                                go(new Intent("android.settings.SLICE_SETTINGS").putExtra("slice_uri",
+                                        "content://com.android.tv.settings.accessories.sliceprovider/general"));
+                            } else if (InputKeyService.openSettingsEntry(this, "Remotes")) {
+                                finish();
+                            } else {
+                                go(new Intent(Settings.ACTION_SETTINGS));
+                            }
                         }},
                 {R.drawable.ic_qp_display, R.string.qp_display_mode, null,
                         (Action) () -> go(new Intent("android.settings.oem.DISPLAYMODE_SETTINGS"),
@@ -136,10 +145,13 @@ public class QuickPanelActivity extends Activity {
         if (!isFinishing()) finish();
     }
 
-    /** Opens the first intent the TV can handle, then closes the panel. */
+    /**
+     * Opens the first intent the TV can handle, then closes the panel. A fresh task each time, so Back
+     * goes straight home instead of through every Settings page opened before.
+     */
     private void go(Intent... intents) {
         for (Intent i : intents) {
-            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
             try {
                 startActivity(i);
                 finish();

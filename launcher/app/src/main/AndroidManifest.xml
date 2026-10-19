@@ -16,6 +16,10 @@
     <uses-permission android:name="android.permission.READ_TV_LISTINGS" />
     <!-- Show posters in Continue Watching are web images. -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Quick panel: lets Settings open Remotes & Accessories directly (its slice screen requires it).
+         Granted over adb at install time. -->
+    <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS"
+        tools:ignore="ProtectedPermissions" />
     <!-- Running apps: close apps idle in the background. -->
     <uses-permission android:name="android.permission.KILL_BACKGROUND_PROCESSES" />
     <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS"

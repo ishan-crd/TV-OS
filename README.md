@@ -31,8 +31,10 @@ install tools and debloat approach it builds on. The home screen design is inspi
 - **Quick settings panel** on the remote's Settings button, laid out like Google TV's: date and time,
   **All settings**, and tiles for Screensaver, Inputs, Picture, Sound, Wi-Fi (with the network name),
   Bluetooth (Remotes & Accessories), Display mode and Accessibility. It slides in from the right over
-  whatever is playing, and nothing of it runs while it's closed. Bluetooth's page is one Settings won't
-  open for other apps, so the remote-key service selects it inside Settings (it only watches Settings).
+  whatever is playing, and nothing of it runs while it's closed. Bluetooth opens Remotes &
+  Accessories directly, as Google TV's panel does: Settings only shows that page to holders of
+  `WRITE_SECURE_SETTINGS`, which the install script grants over adb (without it, the remote-key service
+  selects the entry inside Settings). Pages open in a fresh task, so one Back returns home.
 - **Running apps** (last tile of the quick panel): the apps you opened since the TV started, memory in
   use, ✕ per app and **Clear all**. Closing is a real force stop, which Android only allows the system,
   so the remote-key service presses Force stop → OK on each app's Settings page (about a second per app)
@@ -71,7 +73,8 @@ You need a computer on the same network as the TV, Python 3, JDK 17 and the Andr
    TV_HOST=$TV_HOST JAVA_HOME=/path/to/jdk17 INPUT_KEY_SERVICE=1 ./build-and-install.sh
    ```
    The script installs the launcher, sets it as Home, disables the stock launcher it recognises, grants
-   usage access and `READ_TV_LISTINGS` (for Continue Watching) and, with `INPUT_KEY_SERVICE=1`, turns on
+   usage access and `READ_TV_LISTINGS` (for Continue Watching), `WRITE_SECURE_SETTINGS` (for the quick
+   panel's Bluetooth page) and, with `INPUT_KEY_SERVICE=1`, turns on
    the remote-key service.
 5. **Optional screensaver**:
    ```bash

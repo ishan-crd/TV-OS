@@ -135,7 +135,7 @@ public class InputKeyService extends AccessibilityService {
         s.pendingEntry = title.toLowerCase(java.util.Locale.ROOT);
         s.pendingUntil = System.currentTimeMillis() + 5000;
         s.pendingScrolls = 0;
-        s.open(new Intent(android.provider.Settings.ACTION_SETTINGS));
+        s.open(new Intent(android.provider.Settings.ACTION_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK));
         return true;
     }
 
@@ -165,7 +165,7 @@ public class InputKeyService extends AccessibilityService {
         stopStep = 0;
         stopDeadline = System.currentTimeMillis() + 5000;
         open(new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                android.net.Uri.parse("package:" + stopping)));
+                android.net.Uri.parse("package:" + stopping)).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK));
         handler.removeCallbacks(stopWatchdog);
         handler.postDelayed(stopWatchdog, 500);
     }
