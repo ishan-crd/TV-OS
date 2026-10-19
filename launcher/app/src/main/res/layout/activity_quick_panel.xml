@@ -93,6 +93,56 @@
             android:layout_height="wrap_content"
             android:orientation="vertical" />
 
+        <!-- Wi-Fi: the current network and nearby ones; choosing one opens its connect screen in Settings.
+             Back returns to the tiles. -->
+        <LinearLayout
+            android:id="@+id/qpWifi"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="4dp"
+                android:layout_marginBottom="10dp"
+                android:text="@string/wifi"
+                android:textColor="#FFFFFFFF"
+                android:textSize="16sp"
+                android:fontFamily="@font/ui"
+                android:fontVariationSettings="'wght' 600, 'opsz' 28" />
+
+            <ScrollView
+                android:id="@+id/qpWifiScroll"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:scrollbars="none"
+                android:overScrollMode="never">
+
+                <LinearLayout
+                    android:id="@+id/qpWifiList"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical" />
+            </ScrollView>
+
+            <TextView
+                android:id="@+id/qpWifiAll"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:layout_marginTop="4dp"
+                android:gravity="center"
+                android:background="@drawable/qp_tile_bg"
+                android:focusable="true"
+                android:clickable="true"
+                android:text="@string/wifi_all_settings"
+                android:textColor="@color/qp_fg"
+                android:textSize="12.5sp"
+                android:fontFamily="@font/ui"
+                android:fontVariationSettings="'wght' 600, 'opsz' 17" />
+        </LinearLayout>
+
         <!-- AirPlay without the receiver app: where to get it. Back returns to the tiles. -->
         <LinearLayout
             android:id="@+id/qpAirPlayInfo"

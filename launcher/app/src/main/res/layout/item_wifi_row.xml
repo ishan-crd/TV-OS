@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One network in the quick panel's Wi-Fi list. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="48dp"
+    android:layout_marginBottom="6dp"
+    android:paddingStart="12dp"
+    android:paddingEnd="12dp"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:background="@drawable/qp_tile_bg"
+    android:focusable="true"
+    android:clickable="true">
+
+    <ImageView
+        android:id="@+id/wfSignal"
+        android:layout_width="17dp"
+        android:layout_height="17dp"
+        android:src="@drawable/ic_wifi"
+        android:tint="@color/qp_fg"
+        android:duplicateParentState="true"
+        android:contentDescription="@null" />
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:layout_marginStart="10dp"
+        android:duplicateParentState="true"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/wfName"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:singleLine="true"
+            android:ellipsize="end"
+            android:duplicateParentState="true"
+            android:textColor="@color/qp_fg"
+            android:textSize="12.5sp"
+            android:fontFamily="@font/ui"
+            android:fontVariationSettings="'wght' 500, 'opsz' 17" />
+
+        <TextView
+            android:id="@+id/wfSub"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:singleLine="true"
+            android:duplicateParentState="true"
+            android:alpha="0.75"
+            android:textColor="@color/qp_fg"
+            android:textSize="10sp"
+            android:fontFamily="@font/ui"
+            android:fontVariationSettings="'wght' 400, 'opsz' 17" />
+    </LinearLayout>
+
+    <ImageView
+        android:id="@+id/wfLock"
+        android:layout_width="13dp"
+        android:layout_height="13dp"
+        android:layout_marginStart="8dp"
+        android:src="@drawable/ic_lock"
+        android:tint="@color/qp_fg"
+        android:alpha="0.7"
+        android:duplicateParentState="true"
+        android:contentDescription="@null" />
+</LinearLayout>

@@ -33,6 +33,7 @@ public class InputKeyService extends AccessibilityService {
     private String pendingEntry;
     private long pendingUntil;
     private int pendingScrolls;
+    private boolean pendingExact;
 
     // Force stop, one app at a time: its info page, "Force stop", then "OK" in the confirmation.
     private final java.util.ArrayDeque<String> stopQueue = new java.util.ArrayDeque<>();
@@ -130,12 +131,21 @@ public class InputKeyService extends AccessibilityService {
      * (input_key_service.xml), so this costs nothing elsewhere. False when the service isn't running.
      */
     static boolean openSettingsEntry(android.content.Context c, String title) {
+        return openSettingsEntry(new Intent(android.provider.Settings.ACTION_SETTINGS), title, false);
+    }
+
+    /**
+     * Opens a Settings screen and selects the entry titled `title` there (exactly, or by prefix), e.g. a
+     * Wi-Fi network in the network list.
+     */
+    static boolean openSettingsEntry(Intent screen, String title, boolean exact) {
         InputKeyService s = instance;
         if (s == null) return false;
+        s.pendingExact = exact;
         s.pendingEntry = title.toLowerCase(java.util.Locale.ROOT);
         s.pendingUntil = System.currentTimeMillis() + 5000;
         s.pendingScrolls = 0;
-        s.open(new Intent(android.provider.Settings.ACTION_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK));
+        s.open(screen.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK));
         return true;
     }
 
@@ -226,7 +236,8 @@ public class InputKeyService extends AccessibilityService {
         }
         android.view.accessibility.AccessibilityNodeInfo root = getRootInActiveWindow();
         if (root == null) return;
-        android.view.accessibility.AccessibilityNodeInfo hit = find(root, pendingEntry);
+        android.view.accessibility.AccessibilityNodeInfo hit = pendingExact
+                ? findExact(root, pendingEntry) : find(root, pendingEntry);
         if (hit == null) {
             // Not laid out yet: the entry is further down the list. Scroll it a page at a time.
             android.view.accessibility.AccessibilityNodeInfo list = scrollable(root);

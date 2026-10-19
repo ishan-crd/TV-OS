@@ -35,6 +35,10 @@ install tools and debloat approach it builds on. The home screen design is inspi
   Accessories directly, as Google TV's panel does: Settings only shows that page to holders of
   `WRITE_SECURE_SETTINGS`, which the install script grants over adb (without it, the remote-key service
   selects the entry inside Settings). Pages open in a fresh task, so one Back returns home.
+  **Wi-Fi** shows the network list inside the panel, like Google TV's: the current network first
+  ("Connected"), then nearby ones by signal with a lock on secured ones, refreshed when a scan finishes.
+  Android lets only system apps join a network, so choosing one opens its password screen in Settings
+  (the remote-key service picks it in the list); "All Wi-Fi settings" opens the full page.
 - **AirPlay** tile: switches an AirPlay receiver on and off ("On · Bedroom" / "Off") so an iPhone, iPad or
   Mac can mirror to the TV, without ever opening the receiver app; long press opens its settings. The
   receiver is a separate app, [iMirror](https://github.com/prat3ik/iMirror) (GPL-3.0, kept out of this MIT

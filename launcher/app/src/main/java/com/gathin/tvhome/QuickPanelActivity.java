@@ -56,8 +56,7 @@ public class QuickPanelActivity extends Activity {
                 {R.drawable.ic_qp_sound, R.string.qp_sound, null,
                         (Action) () -> go(new Intent("com.android.tv.action.VIEW_SOUND_SETTINGS"),
                                 new Intent(Settings.ACTION_SOUND_SETTINGS))},
-                {R.drawable.ic_wifi, R.string.wifi, networkName(),
-                        (Action) () -> go(new Intent(Settings.ACTION_WIFI_SETTINGS))},
+                {R.drawable.ic_wifi, R.string.wifi, networkName(), (Action) this::showWifi},
                 {R.drawable.ic_qp_bluetooth, R.string.qp_bluetooth, null,
                         // Android TV's own "Remotes & Accessories" page (Bluetooth on/off, pair, devices), opened
                         // directly as Google TV's panel does. Settings only shows it to holders of
@@ -113,6 +112,7 @@ public class QuickPanelActivity extends Activity {
             final Action action = (Action) items[i][3];
             tile.setOnClickListener(v -> action.run());
             if ((int) items[i][1] == R.string.qp_mirroring) airPlayTile = tile;
+            if ((int) items[i][1] == R.string.wifi) wifiTile = tile;
             if ((int) items[i][1] == R.string.qp_mirroring && mirrorIntent != null) {
                 airPlaySub = tile.findViewById(R.id.qpSub);
                 // Long press: the receiver's own settings (name, PIN).
@@ -136,7 +136,120 @@ public class QuickPanelActivity extends Activity {
     }
 
     private TextView airPlaySub;
-    private View airPlayTile;
+    private View airPlayTile, wifiTile;
+    private android.content.BroadcastReceiver scanReceiver;
+
+    // ---- Wi-Fi list ------------------------------------------------------------------------------
+
+    /**
+     * Swaps the tiles for the Wi-Fi list, as Google TV's panel did: the current network, then nearby ones
+     * by signal. Android lets only system apps connect to a network, so choosing one opens its connect
+     * screen in Settings (the remote-key service selects it in the list).
+     */
+    private void showWifi() {
+        findViewById(R.id.qpTiles).setVisibility(View.GONE);
+        findViewById(R.id.qpWifi).setVisibility(View.VISIBLE);
+        findViewById(R.id.qpWifiAll).setOnClickListener(v -> go(new Intent(Settings.ACTION_WIFI_SETTINGS)));
+        fillWifi();
+        // Fresh results arrive a few seconds after a scan; the list refreshes then (focus stays put).
+        android.net.wifi.WifiManager wm = getApplicationContext().getSystemService(android.net.wifi.WifiManager.class);
+        scanReceiver = new android.content.BroadcastReceiver() {
+            @Override
+            public void onReceive(Context c, Intent i) {
+                fillWifi();
+            }
+        };
+        registerReceiver(scanReceiver, new android.content.IntentFilter(
+                android.net.wifi.WifiManager.SCAN_RESULTS_AVAILABLE_ACTION));
+        try {
+            //noinspection deprecation
+            wm.startScan();
+        } catch (Exception ignored) {
+        }
+    }
+
+    private void fillWifi() {
+        LinearLayout list = findViewById(R.id.qpWifiList);
+        View focused = getCurrentFocus();
+        String focusedSsid = focused != null && focused.getTag() instanceof String ? (String) focused.getTag() : null;
+        list.removeAllViews();
+        android.net.wifi.WifiManager wm = getApplicationContext().getSystemService(android.net.wifi.WifiManager.class);
+        String current = networkName();
+        // One row per network name: its strongest access point (2.4 and 5 GHz radios share a name).
+        java.util.Map<String, android.net.wifi.ScanResult> best = new java.util.LinkedHashMap<>();
+        try {
+            for (android.net.wifi.ScanResult r : wm.getScanResults()) {
+                //noinspection deprecation
+                String ssid = r.SSID;
+                if (ssid == null || ssid.trim().isEmpty()) continue;
+                android.net.wifi.ScanResult b = best.get(ssid);
+                if (b == null || r.level > b.level) best.put(ssid, r);
+            }
+        } catch (SecurityException ignored) {
+        }
+        java.util.List<android.net.wifi.ScanResult> nets = new java.util.ArrayList<>(best.values());
+        //noinspection deprecation
+        nets.sort((a, b) -> a.SSID.equals(current) ? -1 : b.SSID.equals(current) ? 1 : Integer.compare(b.level, a.level));
+        if (nets.size() > 12) nets = nets.subList(0, 12);
+        View restore = null;
+        for (android.net.wifi.ScanResult r : nets) {
+            //noinspection deprecation
+            final String ssid = r.SSID;
+            boolean connected = ssid.equals(current);
+            boolean secured = r.capabilities != null && (r.capabilities.contains("WPA")
+                    || r.capabilities.contains("WEP") || r.capabilities.contains("SAE") || r.capabilities.contains("EAP"));
+            View row = getLayoutInflater().inflate(R.layout.item_wifi_row, list, false);
+            row.setTag(ssid);
+            ((TextView) row.findViewById(R.id.wfName)).setText(ssid);
+            ((TextView) row.findViewById(R.id.wfSub)).setText(connected ? R.string.wifi_connected
+                    : secured ? R.string.wifi_secured : R.string.wifi_open);
+            // Signal: the icon fades with distance (5 levels).
+            int level = android.net.wifi.WifiManager.calculateSignalLevel(r.level, 5);
+            row.findViewById(R.id.wfSignal).setAlpha(0.35f + 0.65f * level / 4f);
+            row.findViewById(R.id.wfLock).setVisibility(secured ? View.VISIBLE : View.GONE);
+            row.setOnClickListener(v -> {
+                Intent wifi = new Intent(Settings.ACTION_WIFI_SETTINGS);
+                if (connected || !InputKeyService.openSettingsEntry(wifi, ssid, true)) go(wifi);
+                else finish();
+            });
+            list.addView(row);
+            if (ssid.equals(focusedSsid)) restore = row;
+        }
+        if (nets.isEmpty()) {
+            TextView none = new TextView(this);
+            none.setText(R.string.wifi_none);
+            none.setTextColor(0x99FFFFFF);
+            none.setPadding(0, 8, 0, 16);
+            list.addView(none);
+        }
+        // At most five rows on screen; more scroll.
+        View scroll = findViewById(R.id.qpWifiScroll);
+        android.view.ViewGroup.LayoutParams lp = scroll.getLayoutParams();
+        lp.height = nets.size() > 5 ? Math.round(5 * 54 * getResources().getDisplayMetrics().density)
+                : android.view.ViewGroup.LayoutParams.WRAP_CONTENT;
+        scroll.setLayoutParams(lp);
+        if (restore != null) restore.requestFocus();
+        else if (focusedSsid == null && list.getChildCount() > 0 && !(focused != null && focused.getId() == R.id.qpWifiAll)) {
+            list.getChildAt(0).requestFocus();
+        }
+    }
+
+    private void hideWifi() {
+        if (scanReceiver != null) {
+            unregisterReceiver(scanReceiver);
+            scanReceiver = null;
+        }
+        findViewById(R.id.qpWifi).setVisibility(View.GONE);
+        findViewById(R.id.qpTiles).setVisibility(View.VISIBLE);
+        if (wifiTile != null) wifiTile.requestFocus();
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (scanReceiver != null) unregisterReceiver(scanReceiver);
+        scanReceiver = null;
+        super.onDestroy();
+    }
 
     /** Swaps the tiles for "get the iMirror app" (link and QR code); Back swaps them back. */
     private void showAirPlayInfo() {
@@ -148,6 +261,10 @@ public class QuickPanelActivity extends Activity {
 
     @Override
     public void onBackPressed() {
+        if (findViewById(R.id.qpWifi).getVisibility() == View.VISIBLE) {
+            hideWifi();
+            return;
+        }
         View info = findViewById(R.id.qpAirPlayInfo);
         if (info.getVisibility() == View.VISIBLE) {
             info.setVisibility(View.GONE);
