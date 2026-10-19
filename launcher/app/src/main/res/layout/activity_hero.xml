@@ -79,12 +79,14 @@
                 android:shadowDy="2"
                 android:shadowRadius="8" />
 
+            <!-- "App · [VIDEO]": hidden for now; remove visibility="gone" to bring it back. -->
             <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="14dp"
                 android:gravity="center_vertical"
-                android:orientation="horizontal">
+                android:orientation="horizontal"
+                android:visibility="gone">
 
                 <TextView
                     android:id="@+id/meta"
@@ -119,7 +121,7 @@
                 android:id="@+id/tagline"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="9dp"
+                android:layout_marginTop="14dp"
                 android:maxLines="2"
                 android:ellipsize="end"
                 android:textColor="#D9FFFFFF"
