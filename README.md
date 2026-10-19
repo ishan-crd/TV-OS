@@ -15,6 +15,17 @@ install tools and debloat approach it builds on. The home screen design is inspi
 
 **Hero home** (default):
 
+- **Featured films and series** (with a TMDB key): the titles your apps report as in progress (Android
+  TV's Watch Next), with TMDB details in a cinema layout: full-screen backdrop, poster, glass genre
+  chips, title, country · year · age rating · length, plot, a white **Watch movie** (resumes it in its
+  app) and a glass **Add to wishlist**, the rating (8.7/10, green/yellow/red) with review count, and a
+  glass card with the director (or creator) and cast, **See full cast** for up to eight. Left/Right
+  switches titles (a different order each day); below it, **Similar movies** posters from TMDB. Picking
+  one shows its details (Watch appears only for titles one of your apps has); saved titles form a
+  **Wishlist** row. Responses and images are cached on disk, so a resume needs no network.
+  Get a free key at themoviedb.org → Settings → API and put `tmdb.key=<API key>` in
+  `launcher/local.properties` (git-ignored). Without a key, the app carousel below is shown instead.
+
 - **Featured carousel** of your four dock apps over full-screen ambient artwork in each app's own colour,
   with the app's name, a line about it, an "App · Video · TODAY" line, a white **Open** button, info and
   next buttons, and page dots. It advances every 9 seconds.

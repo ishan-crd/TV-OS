@@ -35,11 +35,12 @@ final class HeroHome implements RowAdapter.Listener {
 
     private static final long AUTO_ADVANCE_MS = 9000;
     private static final long ROW_BACKDROP_DELAY_MS = 220;
-    /** How far the page slides up when the rows take focus. */
-    private static final float ROWS_SHIFT_DP = 386;
+    private static final long MOVIE_ADVANCE_MS = 12000;
+    /** How far the page slides up when the rows take focus (set by the hero mode). */
+    private float rowsShiftDp = 386;
 
     // Static so they survive the activity being recreated while another app is open.
-    private static String lastSlidePkg;
+    private static String lastSlidePkg, lastMovieKey;
     private static int lastRow = -1, lastRowPos;
 
     private final MainActivity act;
@@ -52,8 +53,9 @@ final class HeroHome implements RowAdapter.Listener {
     private final ImageView logo;
     private final TextView title, meta, badge, tagline;
     private final DotsView dots;
-    /** 0 Your Apps, 1 Continue Watching, 2 All Apps. An empty row is hidden and skipped. */
-    private static final int ROWS = 3;
+    /** 0 Similar, 1 Your Apps, 2 Continue Watching, 3 Wishlist, 4 All Apps. An empty row is hidden and skipped. */
+    private static final int ROWS = 5;
+    private static final int R_SIMILAR = 0, R_YOUR = 1, R_CONTINUE = 2, R_WISH = 3, R_ALL = 4;
     private final RecyclerView[] rows = new RecyclerView[ROWS];
     private final RowAdapter[] adapters = new RowAdapter[ROWS];
     private final TextView[] rowTitles = new TextView[ROWS];
@@ -75,11 +77,41 @@ final class HeroHome implements RowAdapter.Listener {
     /** Extra darkening of the artwork at night (config.xml night_*), 0 by day. */
     private float nightDim;
 
+    // ---- featured films and series (TMDB) ----
+    /** A title your apps report, with its TMDB details; program is null for one picked from a row. */
+    static final class Featured {
+        final Tmdb.Meta meta;
+        final WatchNext.Program program;
+        final AppAdapter.Entry app;
+
+        Featured(Tmdb.Meta meta, WatchNext.Program program, AppAdapter.Entry app) {
+            this.meta = meta;
+            this.program = program;
+            this.app = app;
+        }
+    }
+
+    private final Tmdb tmdb;
+    private final java.util.concurrent.ExecutorService worker = java.util.concurrent.Executors.newSingleThreadExecutor();
+    private final List<Featured> movies = new ArrayList<>();
+    private boolean movieMode;
+    /** The film or series on screen (a carousel entry, or one picked from Similar/Wishlist). */
+    private Featured shown;
+    private boolean fullCast;
+    private List<WatchNext.Program> programs = new ArrayList<>();
+    private final View movieHero, mvWatch, mvWish, mvFullCast, rowsBlock;
+    private final ImageView mvPoster, mvWishIcon;
+    private final TextView mvTitle, mvFacts, mvPlot, mvRating, mvVotes, mvWatchLabel, mvWishLabel;
+    private final android.widget.LinearLayout mvChips, mvCrew;
+
     private final Runnable autoAdvance = new Runnable() {
         @Override
         public void run() {
-            if (!inRows && slides.size() > 1 && act.hasWindowFocus()) showSlide(slide + 1, 1);
-            handler.postDelayed(this, AUTO_ADVANCE_MS);
+            if (!inRows && slideCount() > 1 && act.hasWindowFocus() && (!movieMode || shown == null
+                    || shown.program != null)) {
+                showSlide(slide + 1, 1);
+            }
+            handler.postDelayed(this, movieMode ? MOVIE_ADVANCE_MS : AUTO_ADVANCE_MS);
         }
     };
     private final Runnable rowBackdrop = () -> {
@@ -106,16 +138,47 @@ final class HeroHome implements RowAdapter.Listener {
         btnOpen = act.findViewById(R.id.btnOpen);
         btnInfo = act.findViewById(R.id.btnInfo);
         btnNext = act.findViewById(R.id.btnNext);
+        tmdb = new Tmdb(act);
+        movieHero = act.findViewById(R.id.movieHero);
+        rowsBlock = act.findViewById(R.id.rows);
+        mvPoster = act.findViewById(R.id.mvPoster);
+        mvTitle = act.findViewById(R.id.mvTitle);
+        mvFacts = act.findViewById(R.id.mvFacts);
+        mvPlot = act.findViewById(R.id.mvPlot);
+        mvRating = act.findViewById(R.id.mvRating);
+        mvVotes = act.findViewById(R.id.mvVotes);
+        mvChips = act.findViewById(R.id.mvChips);
+        mvCrew = act.findViewById(R.id.mvCrew);
+        mvWatch = act.findViewById(R.id.mvWatch);
+        mvWish = act.findViewById(R.id.mvWish);
+        mvWishIcon = act.findViewById(R.id.mvWishIcon);
+        mvWatchLabel = act.findViewById(R.id.mvWatchLabel);
+        mvWishLabel = act.findViewById(R.id.mvWishLabel);
+        mvFullCast = act.findViewById(R.id.mvFullCast);
+        roundCorners(mvPoster, 12);
+        mvWatch.setOnClickListener(v -> {
+            if (shown != null && shown.program != null) WatchNext.open(act, shown.program, shown.app);
+        });
+        mvWish.setOnClickListener(v -> {
+            if (shown == null) return;
+            Prefs.toggleWishlist(act, shown.meta.brief());
+            bindWish();
+            fillWishlist();
+        });
+        mvFullCast.setOnClickListener(v -> {
+            fullCast = !fullCast;
+            if (shown != null) bindCrew(shown.meta);
+        });
 
-        int[] ids = {R.id.row1, R.id.row2, R.id.row3};
-        int[] titleIds = {R.id.row1Title, R.id.row2Title, R.id.row3Title};
+        int[] ids = {R.id.row0, R.id.row1, R.id.row2, R.id.row3, R.id.row4};
+        int[] titleIds = {R.id.row0Title, R.id.row1Title, R.id.row2Title, R.id.row3Title, R.id.row4Title};
         for (int i = 0; i < ROWS; i++) {
             rows[i] = act.findViewById(ids[i]);
             rowTitles[i] = act.findViewById(titleIds[i]);
             rows[i].setLayoutManager(new LinearLayoutManager(act, LinearLayoutManager.HORIZONTAL, false));
             rows[i].setItemAnimator(null);
             rows[i].setHasFixedSize(true);
-            adapters[i] = new RowAdapter(i, this);
+            adapters[i] = new RowAdapter(i, this, i == R_SIMILAR || i == R_WISH);
             rows[i].setAdapter(adapters[i]);
         }
 
@@ -127,10 +190,10 @@ final class HeroHome implements RowAdapter.Listener {
         });
         btnNext.setOnClickListener(v -> showSlide(slide + 1, 1));
         View.OnKeyListener heroKeys = this::onHeroKey;
-        for (View b : new View[]{btnOpen, btnInfo, btnNext}) {
+        for (View b : new View[]{btnOpen, btnInfo, btnNext, mvWatch, mvWish, mvFullCast}) {
             b.setOnKeyListener(heroKeys);
             // Apple's focus growth: about 10 pt on the pill, more on the small circles.
-            final float s = b == btnOpen ? 1.05f : 1.12f;
+            final float s = b == btnOpen || b == mvWatch || b == mvWish ? 1.05f : b == mvFullCast ? 1.04f : 1.12f;
             b.setOnFocusChangeListener((v, f) -> v.animate().scaleX(f ? s : 1f).scaleY(f ? s : 1f)
                     .setDuration(f ? 220 : 160).setInterpolator(new DecelerateInterpolator(1.4f)).start());
         }
@@ -152,6 +215,7 @@ final class HeroHome implements RowAdapter.Listener {
     void onResume() {
         buildRows();
         updateNightDim(false);
+        loadMovies();
         texts.clear();
         logos.clear();
         for (AppAdapter.Entry e : slides) {
@@ -160,11 +224,9 @@ final class HeroHome implements RowAdapter.Listener {
             Bitmap l = customLogo(e.pkg);
             if (l != null) logos.put(e.pkg, l);
         }
-        dots.setCount(slides.size());
-        int i = 0;
-        for (int k = 0; k < slides.size(); k++) if (slides.get(k).pkg.equals(lastSlidePkg)) i = k;
+        dots.setCount(slideCount());
         slide = -1;
-        showSlide(i, 0);
+        showSlide(startIndex(), 0);
 
         // Back from an app opened from a row: return to that card, otherwise to Open.
         if (lastRow >= 0 && lastRow < ROWS && adapters[lastRow].getItemCount() > 0) {
@@ -196,21 +258,22 @@ final class HeroHome implements RowAdapter.Listener {
         List<RowAdapter.Item> first = new ArrayList<>();
         for (String pkg : Prefs.list(act, Prefs.YOUR_APPS)) if (apps.containsKey(pkg)) first.add(new RowAdapter.Item(apps.get(pkg), null));
         if (!first.isEmpty()) {
-            rowTitles[0].setText(R.string.hero_your_apps);
+            rowTitles[R_YOUR].setText(R.string.hero_your_apps);
         } else {
             List<AppAdapter.Entry> recent = new ArrayList<>();
             for (AppAdapter.Entry e : all) if (lastUsed.containsKey(e.pkg)) recent.add(e);
             recent.sort((a, b) -> Long.compare(lastUsed.get(b.pkg), lastUsed.get(a.pkg)));
             for (AppAdapter.Entry e : recent.subList(0, Math.min(12, recent.size()))) first.add(new RowAdapter.Item(e, null));
-            rowTitles[0].setText(first.isEmpty() ? R.string.hero_favourites : R.string.hero_recent);
+            rowTitles[R_YOUR].setText(first.isEmpty() ? R.string.hero_favourites : R.string.hero_recent);
             if (first.isEmpty()) for (AppAdapter.Entry e : slides) first.add(new RowAdapter.Item(e, null));
         }
-        setRow(0, first);
+        setRow(R_YOUR, first);
 
         // Continue Watching: the shows apps report to Android TV's Watch Next list (needs READ_TV_LISTINGS).
         // Without it, or with nothing reported, the video apps used in the last week, most recent first.
         List<RowAdapter.Item> watching = new ArrayList<>();
-        for (WatchNext.Program p : WatchNext.load(act, apps.keySet(), 20)) {
+        programs = WatchNext.load(act, apps.keySet(), 20);
+        for (WatchNext.Program p : programs) {
             watching.add(new RowAdapter.Item(p, apps.get(p.pkg)));
         }
         if (watching.isEmpty()) {
@@ -223,15 +286,16 @@ final class HeroHome implements RowAdapter.Listener {
             used.sort((a, b) -> Long.compare(lastUsed.get(b.pkg), lastUsed.get(a.pkg)));
             for (AppAdapter.Entry e : used) watching.add(new RowAdapter.Item(e, recency(e.pkg)));
         }
-        rowTitles[1].setText(R.string.hero_continue);
-        setRow(1, watching);
+        rowTitles[R_CONTINUE].setText(R.string.hero_continue);
+        setRow(R_CONTINUE, watching);
+        fillWishlist();
 
         List<AppAdapter.Entry> alpha = new ArrayList<>(all);
         alpha.sort((a, b) -> a.label.compareToIgnoreCase(b.label));
         List<RowAdapter.Item> allItems = new ArrayList<>();
         for (AppAdapter.Entry e : alpha) allItems.add(new RowAdapter.Item(e, null));
-        rowTitles[2].setText(R.string.hero_all_apps);
-        setRow(2, allItems);
+        rowTitles[R_ALL].setText(R.string.hero_all_apps);
+        setRow(R_ALL, allItems);
     }
 
     /** Called every minute by MainActivity. */
@@ -255,6 +319,10 @@ final class HeroHome implements RowAdapter.Listener {
 
     /** dir: +1 next, -1 previous, 0 no animation. */
     private void showSlide(int index, int dir) {
+        if (movieMode) {
+            showMovieSlide(index, dir);
+            return;
+        }
         if (slides.isEmpty()) return;
         int n = slides.size();
         int i = ((index % n) + n) % n;
@@ -314,28 +382,357 @@ final class HeroHome implements RowAdapter.Listener {
         handler.removeCallbacks(autoAdvance);
         handler.postDelayed(autoAdvance, AUTO_ADVANCE_MS);
         switch (keyCode) {
-            case KeyEvent.KEYCODE_DPAD_DOWN:
+            case KeyEvent.KEYCODE_DPAD_DOWN: {
+                int first = nextRow(-1, 1);
+                if (first < 0) return true;
                 enterRows(true);
-                focusCard(0, 0);
+                focusCard(first, 0);
                 return true;
+            }
             case KeyEvent.KEYCODE_DPAD_UP:
                 act.findViewById(R.id.btnWifi).requestFocus();
                 return true;
             case KeyEvent.KEYCODE_DPAD_LEFT:
-                if (v == btnOpen) {
+                if (v == btnOpen || v == mvWatch || (v == mvWish && mvWatch.getVisibility() != View.VISIBLE)) {
                     showSlide(slide - 1, -1);
+                    return true;
+                }
+                if (v == mvFullCast) {
+                    mvWish.requestFocus();
                     return true;
                 }
                 return false;
             case KeyEvent.KEYCODE_DPAD_RIGHT:
-                if (v == btnNext) {
+                if (v == btnNext || v == mvFullCast || (v == mvWish && mvFullCast.getVisibility() != View.VISIBLE)) {
                     showSlide(slide + 1, 1);
+                    return true;
+                }
+                if (v == mvWish) {
+                    mvFullCast.requestFocus();
                     return true;
                 }
                 return false;
             default:
                 return false;
         }
+    }
+
+    // ---- featured films and series ----------------------------------------------------------------
+
+    private int slideCount() {
+        return movieMode ? movies.size() : slides.size();
+    }
+
+    /** The carousel entry to start on: the one shown last time. */
+    private int startIndex() {
+        if (movieMode) {
+            for (int k = 0; k < movies.size(); k++) if (movies.get(k).meta.brief().key().equals(lastMovieKey)) return k;
+            return 0;
+        }
+        for (int k = 0; k < slides.size(); k++) if (slides.get(k).pkg.equals(lastSlidePkg)) return k;
+        return 0;
+    }
+
+    /**
+     * Looks up the titles your apps report (Watch Next) on TMDB in the background; with at least one match
+     * the hero switches to the film view. Cached on disk, so after the first time this is quick and offline.
+     */
+    private void loadMovies() {
+        if (!tmdb.enabled()) return;
+        final List<WatchNext.Program> progs = new ArrayList<>(programs);
+        final Map<String, AppAdapter.Entry> appMap = new HashMap<>(apps);
+        worker.execute(() -> {
+            List<Featured> found = new ArrayList<>();
+            java.util.Set<String> seen = new java.util.HashSet<>();
+            for (WatchNext.Program p : progs) {
+                if (found.size() >= 10) break;
+                Tmdb.Meta m = tmdb.find(p.title, !p.movie);
+                if (m == null || m.backdrop == null || m.poster == null || !seen.add(m.brief().key())) continue;
+                found.add(new Featured(m, p, appMap.get(p.pkg)));
+            }
+            // A different order each day, so the home doesn't open on the same film every time.
+            java.util.Collections.shuffle(found, new java.util.Random(System.currentTimeMillis() / 86_400_000L));
+            handler.post(() -> setMovies(found));
+        });
+    }
+
+    private void setMovies(List<Featured> found) {
+        String before = shown != null && shown.program != null ? shown.meta.brief().key() : null;
+        List<String> oldKeys = new ArrayList<>(), newKeys = new ArrayList<>();
+        for (Featured f : movies) oldKeys.add(f.meta.brief().key());
+        for (Featured f : found) newKeys.add(f.meta.brief().key());
+        if (movieMode && oldKeys.equals(newKeys)) return;   // nothing changed since last resume
+        movies.clear();
+        movies.addAll(found);
+        boolean was = movieMode;
+        movieMode = !movies.isEmpty();
+        // Layout for the mode: the film view is taller, so the rows start and slide up from lower down.
+        heroText.setVisibility(movieMode ? View.GONE : View.VISIBLE);
+        buttons.setVisibility(movieMode ? View.GONE : View.VISIBLE);
+        movieHero.setVisibility(movieMode ? View.VISIBLE : View.GONE);
+        android.widget.FrameLayout.LayoutParams rl = (android.widget.FrameLayout.LayoutParams) rowsBlock.getLayoutParams();
+        rl.topMargin = Math.round((movieMode ? 400 : 456) * density);
+        rowsBlock.setLayoutParams(rl);
+        android.widget.FrameLayout.LayoutParams dl = (android.widget.FrameLayout.LayoutParams) dots.getLayoutParams();
+        dl.topMargin = Math.round((movieMode ? 381 : 423) * density);
+        dots.setLayoutParams(dl);
+        rowsShiftDp = movieMode ? 334 : 386;
+        if (!movieMode) setRow(R_SIMILAR, new ArrayList<>());
+        dots.setCount(slideCount());
+        if (inRows && was == movieMode) return;   // keep the rows as they are under the user's focus
+        slide = -1;
+        int i = 0;
+        for (int k = 0; k < movies.size(); k++) if (movies.get(k).meta.brief().key().equals(before != null ? before : lastMovieKey)) i = k;
+        showSlide(movieMode ? i : startIndex(), 0);
+        if (!inRows) {
+            if (movieMode) mvWatch.requestFocus();
+            else btnOpen.requestFocus();
+        }
+    }
+
+    private void showMovieSlide(int index, int dir) {
+        if (movies.isEmpty()) return;
+        int n = movies.size();
+        int i = ((index % n) + n) % n;
+        if (i == slide && shown != null && shown.program != null) return;
+        slide = i;
+        showFeatured(movies.get(i), dir);
+        dots.setActive(i, dir != 0);
+        lastMovieKey = movies.get(i).meta.brief().key();
+        // Neighbours' artwork in advance.
+        backdrops.preloadImage(Tmdb.IMG + "w780" + movies.get((i + 1) % n).meta.backdrop);
+    }
+
+    /** Puts a film or series in the hero: text slides, the backdrop crossfades. */
+    private void showFeatured(Featured f, int dir) {
+        boolean focusInside = movieHero.hasFocus();
+        shown = f;
+        fullCast = false;
+        if (dir == 0) {
+            movieHero.animate().cancel();
+            movieHero.setTranslationX(0f);
+            bindMovie(f);
+        } else {
+            final float dx = 14 * density * dir;
+            movieHero.animate().alpha(0f).translationX(-dx).setDuration(140).withLayer().withEndAction(() -> {
+                bindMovie(f);
+                movieHero.setTranslationX(dx);
+                movieHero.animate().alpha(inRows ? 0f : 1f).translationX(0f).setDuration(260)
+                        .setInterpolator(new DecelerateInterpolator(1.4f)).withLayer().start();
+            }).start();
+        }
+        if (!inRows) showMovieBackdrop(f.meta, dir != 0 || backA.getDrawable() != null);
+        if (!inRows) fillSimilar(f.meta);
+        if (focusInside && f.program == null && mvWatch.isFocused()) mvWish.requestFocus();
+    }
+
+    private void bindMovie(Featured f) {
+        Tmdb.Meta m = f.meta;
+        mvPoster.setImageDrawable(null);
+        final String key = m.brief().key();
+        Posters.get(act).load(Tmdb.IMG + "w342" + m.poster, 364, 540, (uri, bmp) -> {
+            if (bmp != null && shown != null && shown.meta.brief().key().equals(key)) mvPoster.setImageBitmap(bmp);
+        });
+        mvChips.removeAllViews();
+        for (String g : m.genres) mvChips.addView(chip(g));
+        mvTitle.setText(m.title);
+        List<String> facts = new ArrayList<>();
+        for (String x : new String[]{m.country, m.year, m.certification, m.length}) if (x != null && !x.isEmpty()) facts.add(x);
+        mvFacts.setText(android.text.TextUtils.join("  •  ", facts));
+        mvPlot.setText(m.overview);
+        // Rating: 8.7 large in green (yellow, red when lower), then a small /10.
+        if (m.votes > 0) {
+            String r = String.format(java.util.Locale.US, "%.1f", m.rating);
+            android.text.SpannableString sp = new android.text.SpannableString(r + "/10");
+            int color = m.rating >= 7 ? 0xFF5BD23C : m.rating >= 5 ? 0xFFF5C518 : 0xFFFF6B5B;
+            sp.setSpan(new android.text.style.ForegroundColorSpan(color), 0, r.length(), 0);
+            sp.setSpan(new android.text.style.RelativeSizeSpan(0.5f), r.length(), sp.length(), 0);
+            sp.setSpan(new android.text.style.ForegroundColorSpan(0xE6FFFFFF), r.length(), sp.length(), 0);
+            mvRating.setText(sp);
+            mvVotes.setText(act.getString(R.string.mv_reviews, compact(m.votes)));
+            mvRating.setVisibility(View.VISIBLE);
+            mvVotes.setVisibility(View.VISIBLE);
+        } else {
+            mvRating.setVisibility(View.GONE);
+            mvVotes.setVisibility(View.GONE);
+        }
+        bindCrew(m);
+        boolean playable = f.program != null;
+        mvWatch.setVisibility(playable ? View.VISIBLE : View.GONE);
+        mvWatchLabel.setText(m.tv ? R.string.mv_watch_show : R.string.mv_watch_movie);
+        bindWish();
+    }
+
+    private void bindWish() {
+        if (shown == null) return;
+        boolean in = Prefs.inWishlist(act, shown.meta.brief());
+        mvWishLabel.setText(in ? R.string.mv_in_wishlist : R.string.mv_add_wishlist);
+        mvWishIcon.setImageResource(in ? R.drawable.ic_mv_check : R.drawable.ic_mv_list_add);
+    }
+
+    /** Director (or creator) and the first three of the cast; "See full cast" shows up to eight. */
+    private void bindCrew(Tmdb.Meta m) {
+        mvCrew.removeAllViews();
+        if (m.director != null) {
+            mvCrew.addView(label(m.tv ? R.string.mv_creator : R.string.mv_director, false));
+            mvCrew.addView(person(m.director));
+        }
+        if (!m.cast.isEmpty()) {
+            mvCrew.addView(label(R.string.mv_cast, m.director != null));
+            int n = Math.min(fullCast ? 8 : 3, m.cast.size());
+            for (int i = 0; i < n; i++) mvCrew.addView(person(m.cast.get(i)));
+        }
+        boolean any = m.director != null || !m.cast.isEmpty();
+        mvCrew.setVisibility(any ? View.VISIBLE : View.GONE);
+        mvFullCast.setVisibility(m.cast.size() > 3 ? View.VISIBLE : View.GONE);
+        ((TextView) mvFullCast).setText(fullCast ? R.string.mv_less_cast : R.string.mv_full_cast);
+    }
+
+    private TextView label(int res, boolean gap) {
+        TextView t = new TextView(act);
+        t.setText(res);
+        t.setTextColor(0xD9FFFFFF);
+        t.setTextSize(9f);
+        t.setLetterSpacing(0.06f);
+        t.setTypeface(act.getResources().getFont(R.font.ui));
+        t.setFontVariationSettings("'wght' 500, 'opsz' 17");
+        android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(-2, -2);
+        lp.topMargin = Math.round((gap ? 9 : 2) * density);
+        lp.bottomMargin = Math.round(4 * density);
+        t.setLayoutParams(lp);
+        return t;
+    }
+
+    private View person(Tmdb.Person p) {
+        android.widget.LinearLayout row = new android.widget.LinearLayout(act);
+        row.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+        row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        android.widget.LinearLayout.LayoutParams rl = new android.widget.LinearLayout.LayoutParams(-1, Math.round(23 * density));
+        row.setLayoutParams(rl);
+        ImageView face = new ImageView(act);
+        int sz = Math.round(18 * density);
+        face.setLayoutParams(new android.widget.LinearLayout.LayoutParams(sz, sz));
+        face.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        face.setBackgroundColor(0x33FFFFFF);
+        face.setOutlineProvider(new android.view.ViewOutlineProvider() {
+            @Override
+            public void getOutline(View v, android.graphics.Outline o) {
+                o.setOval(0, 0, v.getWidth(), v.getHeight());
+            }
+        });
+        face.setClipToOutline(true);
+        if (p.photo != null) {
+            Posters.get(act).load(Tmdb.IMG + "w92" + p.photo, 48, 48, (uri, bmp) -> {
+                if (bmp != null) face.setImageBitmap(bmp);
+            });
+        }
+        TextView name = new TextView(act);
+        android.widget.LinearLayout.LayoutParams nl = new android.widget.LinearLayout.LayoutParams(0, -2, 1f);
+        nl.setMarginStart(Math.round(7 * density));
+        name.setLayoutParams(nl);
+        name.setText(p.name);
+        name.setSingleLine(true);
+        name.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        name.setTextColor(0xFFFFFFFF);
+        name.setTextSize(11f);
+        name.setTypeface(act.getResources().getFont(R.font.ui));
+        name.setFontVariationSettings("'wght' 500, 'opsz' 17");
+        row.addView(face);
+        row.addView(name);
+        return row;
+    }
+
+    private TextView chip(String text) {
+        TextView t = new TextView(act);
+        t.setText(text);
+        t.setTextColor(0xFFFFFFFF);
+        t.setTextSize(10.5f);
+        t.setTypeface(act.getResources().getFont(R.font.ui));
+        t.setFontVariationSettings("'wght' 500, 'opsz' 17");
+        t.setGravity(android.view.Gravity.CENTER);
+        t.setIncludeFontPadding(false);
+        t.setBackgroundResource(R.drawable.mv_chip);
+        int ph = Math.round(13 * density);
+        t.setPadding(ph, 0, ph, 0);
+        android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(-2, -1);
+        lp.setMarginEnd(Math.round(5 * density));
+        t.setLayoutParams(lp);
+        return t;
+    }
+
+    private static String compact(int n) {
+        if (n >= 1_000_000) return String.format(java.util.Locale.US, "%.1fM", n / 1e6).replace(".0M", "M");
+        if (n >= 1_000) return (n / 1000) + "K";
+        return String.valueOf(n);
+    }
+
+    private void roundCorners(View v, float dp) {
+        final float r = dp * density;
+        v.setOutlineProvider(new android.view.ViewOutlineProvider() {
+            @Override
+            public void getOutline(View view, android.graphics.Outline o) {
+                o.setRoundRect(0, 0, view.getWidth(), view.getHeight(), r);
+            }
+        });
+        v.setClipToOutline(true);
+    }
+
+    /** Similar titles from TMDB for the film on screen. */
+    private void fillSimilar(Tmdb.Meta m) {
+        List<RowAdapter.Item> items = new ArrayList<>();
+        for (Tmdb.Brief b : m.similar) items.add(new RowAdapter.Item(b));
+        rowTitles[R_SIMILAR].setText(m.tv ? R.string.mv_similar_shows : R.string.mv_similar);
+        setRow(R_SIMILAR, items);
+    }
+
+    private void fillWishlist() {
+        List<RowAdapter.Item> items = new ArrayList<>();
+        for (Tmdb.Brief b : Prefs.wishlist(act)) items.add(new RowAdapter.Item(b));
+        rowTitles[R_WISH].setText(R.string.mv_wishlist);
+        setRow(R_WISH, items);
+    }
+
+    /**
+     * A title picked from Similar or Wishlist: its details in the hero. Watch shows when one of your apps
+     * reports it (Continue Watching); otherwise it can be added to the wishlist.
+     */
+    private void showBrief(Tmdb.Brief b) {
+        Featured inLibrary = null;
+        for (Featured f : movies) if (f.meta.brief().key().equals(b.key())) inLibrary = f;
+        if (inLibrary != null) {
+            exitRows(true);
+            showMovieSlide(movies.indexOf(inLibrary), 1);
+            return;
+        }
+        worker.execute(() -> {
+            Tmdb.Meta m = tmdb.details(b.id, b.tv);
+            if (m == null) return;
+            handler.post(() -> {
+                exitRows(true);
+                showFeatured(new Featured(m, null, null), 1);
+                mvWish.requestFocus();
+            });
+        });
+    }
+
+    private void showMovieBackdrop(Tmdb.Meta m, boolean animate) {
+        if (m.backdrop == null) return;
+        String uri = Tmdb.IMG + "w780" + m.backdrop;
+        String want = "img:" + uri;
+        if (want.equals(wantBackdrop)) return;
+        wantBackdrop = want;
+        backdrops.getImage(uri, (key, bmp) -> {
+            if (key.equals(wantBackdrop) && bmp != null) crossfade(bmp, animate);
+        });
+    }
+
+    private void showImageBackdrop(String uri) {
+        String want = "img:" + uri;
+        if (want.equals(wantBackdrop)) return;
+        wantBackdrop = want;
+        backdrops.getImage(uri, (key, bmp) -> {
+            if (key.equals(wantBackdrop) && bmp != null) crossfade(bmp, true);
+        });
     }
 
     // ---- backdrop --------------------------------------------------------------------------------
@@ -350,6 +747,10 @@ final class HeroHome implements RowAdapter.Listener {
 
     /** A show's poster full screen; its app's backdrop when there is no poster or it won't load. */
     private void showItemBackdrop(RowAdapter.Item it) {
+        if (it.brief != null) {
+            if (it.brief.backdrop != null) showImageBackdrop(Tmdb.IMG + "w780" + it.brief.backdrop);
+            return;
+        }
         if (it.show == null || it.show.posterUri == null) {
             if (it.app != null) showBackdrop(it.app, true);
             return;
@@ -405,11 +806,12 @@ final class HeroHome implements RowAdapter.Listener {
         inRows = true;
         long d = animate && !was ? 380 : 0;
         if (!was) {
-            page.animate().translationY(-ROWS_SHIFT_DP * density).setDuration(d)
+            page.animate().translationY(-rowsShiftDp * density).setDuration(d)
                     .setInterpolator(new DecelerateInterpolator(2f)).start();
         }
         heroText.animate().alpha(0f).setDuration(d / 2).withLayer().start();
         buttons.animate().alpha(0f).setDuration(d / 2).withLayer().start();
+        movieHero.animate().alpha(0f).setDuration(d / 2).withLayer().start();
         dots.animate().alpha(0f).setDuration(d / 2).start();
         applyDim(d);
     }
@@ -421,12 +823,25 @@ final class HeroHome implements RowAdapter.Listener {
         long d = animate ? 380 : 0;
         DecelerateInterpolator ease = new DecelerateInterpolator(2f);
         page.animate().translationY(0f).setDuration(d).setInterpolator(ease).start();
+        // Rows faded out under the top bar while scrolled down come back.
+        for (int r = 0; r < ROWS; r++) {
+            rows[r].animate().cancel();
+            rowTitles[r].animate().cancel();
+            rows[r].setAlpha(1f);
+            rowTitles[r].setAlpha(1f);
+        }
         heroText.animate().alpha(1f).setDuration(d).withLayer().start();
         buttons.animate().alpha(1f).setDuration(d).withLayer().start();
+        movieHero.animate().alpha(1f).setDuration(d).withLayer().start();
         dots.animate().alpha(1f).setDuration(d).start();
         applyDim(d);
-        if (!slides.isEmpty()) showBackdrop(slides.get(slide), animate);
-        btnOpen.requestFocus();
+        if (movieMode) {
+            if (shown != null) showMovieBackdrop(shown.meta, animate);
+            (mvWatch.getVisibility() == View.VISIBLE ? mvWatch : mvWish).requestFocus();
+        } else {
+            if (!slides.isEmpty()) showBackdrop(slides.get(slide), animate);
+            btnOpen.requestFocus();
+        }
         handler.removeCallbacks(autoAdvance);
         handler.postDelayed(autoAdvance, AUTO_ADVANCE_MS);
     }
@@ -544,10 +959,11 @@ final class HeroHome implements RowAdapter.Listener {
         if (second >= 0 && row != first && row != second) {
             extra = rowTitles[row].getTop() - rowTitles[second].getTop();
         }
-        float y = -ROWS_SHIFT_DP * density - extra;
+        float y = -rowsShiftDp * density - extra;
         // Rows that slide up under the top bar fade out instead of peeking out behind the pills.
         for (int r = 0; r < ROWS; r++) {
-            float alpha = extra > 0 && r < second ? 0f : 1f;
+            // Everything above the row placed at the top would sit under the top bar.
+            float alpha = extra > 0 && r < nextRow(row, -1) ? 0f : 1f;
             if (rows[r].getAlpha() != alpha) {
                 rows[r].animate().alpha(alpha).setDuration(animate ? 200 : 0).start();
                 rowTitles[r].animate().alpha(alpha).setDuration(animate ? 200 : 0).start();
@@ -571,7 +987,8 @@ final class HeroHome implements RowAdapter.Listener {
 
     @Override
     public void onCardClick(RowAdapter.Item it) {
-        if (it.show != null) WatchNext.open(act, it.show, it.app);
+        if (it.brief != null) showBrief(it.brief);
+        else if (it.show != null) WatchNext.open(act, it.show, it.app);
         else AppAdapter.launch(act, it.app);
     }
 
@@ -584,9 +1001,8 @@ final class HeroHome implements RowAdapter.Listener {
     private void onMenuChanged(String focusKey) {
         int row = lastRow;
         buildRows();
-        dots.setCount(slides.size());
-        int i = 0;
-        for (int k = 0; k < slides.size(); k++) if (slides.get(k).pkg.equals(lastSlidePkg)) i = k;
+        dots.setCount(slideCount());
+        int i = startIndex();
         slide = -1;
         texts.clear();
         for (AppAdapter.Entry e : slides) {

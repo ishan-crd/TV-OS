@@ -38,7 +38,7 @@
     <FrameLayout
         android:id="@+id/page"
         android:layout_width="match_parent"
-        android:layout_height="1100dp"
+        android:layout_height="1600dp"
         android:clipChildren="false"
         android:clipToPadding="false">
 
@@ -221,6 +221,232 @@
             android:layout_gravity="center_horizontal"
             android:layout_marginTop="423dp" />
 
+        <!-- Featured film or series (TMDB details for titles your apps report): poster, genre chips, title,
+             facts, plot, Watch / Wishlist, rating and a director-and-cast card. Shown instead of heroText,
+             buttons when there is at least one. -->
+        <FrameLayout
+            android:id="@+id/movieHero"
+            android:layout_width="match_parent"
+            android:layout_height="380dp"
+            android:clipChildren="false"
+            android:visibility="gone">
+
+            <ImageView
+                android:id="@+id/mvPoster"
+                android:layout_width="182dp"
+                android:layout_height="270dp"
+                android:layout_marginStart="52dp"
+                android:layout_marginTop="97dp"
+                android:background="@drawable/hero_card_bg"
+                android:scaleType="centerCrop"
+                android:elevation="6dp"
+                android:contentDescription="@null" />
+
+            <LinearLayout
+                android:id="@+id/mvInfo"
+                android:layout_width="340dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="262dp"
+                android:layout_marginTop="97dp"
+                android:orientation="vertical">
+
+                <LinearLayout
+                    android:id="@+id/mvChips"
+                    android:layout_width="wrap_content"
+                    android:layout_height="22dp"
+                    android:orientation="horizontal" />
+
+                <TextView
+                    android:id="@+id/mvTitle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="14dp"
+                    android:maxLines="2"
+                    android:ellipsize="end"
+                    android:includeFontPadding="false"
+                    android:lineSpacingMultiplier="0.95"
+                    android:textColor="#FFFFFFFF"
+                    android:textSize="32sp"
+                    android:fontFamily="@font/ui"
+                    android:fontVariationSettings="'wght' 500, 'opsz' 28"
+                    android:letterSpacing="-0.01"
+                    android:shadowColor="#66000000"
+                    android:shadowDy="1"
+                    android:shadowRadius="6" />
+
+                <TextView
+                    android:id="@+id/mvFacts"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:singleLine="true"
+                    android:textColor="#D9FFFFFF"
+                    android:textSize="11.5sp"
+                    android:fontFamily="@font/ui"
+                    android:fontVariationSettings="'wght' 500, 'opsz' 17" />
+
+                <TextView
+                    android:id="@+id/mvPlot"
+                    android:layout_width="270dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="18dp"
+                    android:maxLines="4"
+                    android:ellipsize="end"
+                    android:lineSpacingMultiplier="1.28"
+                    android:textColor="#E6FFFFFF"
+                    android:textSize="12sp"
+                    android:fontFamily="@font/ui"
+                    android:fontVariationSettings="'wght' 400, 'opsz' 17" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/mvButtons"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:layout_marginStart="262dp"
+                android:layout_marginTop="331dp"
+                android:clipChildren="false"
+                android:orientation="horizontal">
+
+                <LinearLayout
+                    android:id="@+id/mvWatch"
+                    android:layout_width="wrap_content"
+                    android:layout_height="36dp"
+                    android:minWidth="140dp"
+                    android:paddingStart="20dp"
+                    android:paddingEnd="22dp"
+                    android:gravity="center"
+                    android:orientation="horizontal"
+                    android:background="@drawable/hero_pill_bg"
+                    android:focusable="true"
+                    android:clickable="true"
+                    android:nextFocusUp="@+id/btnWifi">
+
+                    <ImageView
+                        android:layout_width="14dp"
+                        android:layout_height="14dp"
+                        android:src="@drawable/ic_play"
+                        android:tint="@color/hero_btn_fg"
+                        android:duplicateParentState="true"
+                        android:contentDescription="@null" />
+
+                    <TextView
+                        android:id="@+id/mvWatchLabel"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:duplicateParentState="true"
+                        android:includeFontPadding="false"
+                        android:text="@string/mv_watch_movie"
+                        android:textColor="@color/hero_btn_fg"
+                        android:textSize="14.5sp"
+                        android:fontFamily="@font/ui"
+                        android:fontVariationSettings="'wght' 500, 'opsz' 17" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/mvWish"
+                    android:layout_width="wrap_content"
+                    android:layout_height="36dp"
+                    android:minWidth="140dp"
+                    android:layout_marginStart="9dp"
+                    android:paddingStart="20dp"
+                    android:paddingEnd="22dp"
+                    android:gravity="center"
+                    android:orientation="horizontal"
+                    android:background="@drawable/hero_pill_bg"
+                    android:focusable="true"
+                    android:clickable="true"
+                    android:nextFocusUp="@+id/btnWifi">
+
+                    <ImageView
+                        android:id="@+id/mvWishIcon"
+                        android:layout_width="15dp"
+                        android:layout_height="15dp"
+                        android:src="@drawable/ic_mv_list_add"
+                        android:tint="@color/hero_btn_fg"
+                        android:duplicateParentState="true"
+                        android:contentDescription="@null" />
+
+                    <TextView
+                        android:id="@+id/mvWishLabel"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:duplicateParentState="true"
+                        android:includeFontPadding="false"
+                        android:text="@string/mv_add_wishlist"
+                        android:textColor="@color/hero_btn_fg"
+                        android:textSize="14.5sp"
+                        android:fontFamily="@font/ui"
+                        android:fontVariationSettings="'wght' 500, 'opsz' 17" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- Right: rating, then director and cast. -->
+            <LinearLayout
+                android:id="@+id/mvSide"
+                android:layout_width="152dp"
+                android:layout_height="wrap_content"
+                android:layout_gravity="end"
+                android:layout_marginEnd="52dp"
+                android:layout_marginTop="92dp"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/mvRating"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:includeFontPadding="false"
+                    android:textColor="#FFFFFFFF"
+                    android:textSize="40sp"
+                    android:fontFamily="@font/ui"
+                    android:fontVariationSettings="'wght' 700, 'opsz' 28"
+                    android:letterSpacing="-0.02"
+                    android:shadowColor="#66000000"
+                    android:shadowRadius="6" />
+
+                <TextView
+                    android:id="@+id/mvVotes"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:textColor="#E6FFFFFF"
+                    android:textSize="12sp"
+                    android:fontFamily="@font/ui"
+                    android:fontVariationSettings="'wght' 500, 'opsz' 17" />
+
+                <LinearLayout
+                    android:id="@+id/mvCrew"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="30dp"
+                    android:paddingStart="10dp"
+                    android:paddingEnd="10dp"
+                    android:paddingTop="8dp"
+                    android:paddingBottom="10dp"
+                    android:orientation="vertical"
+                    android:background="@drawable/mv_glass_card" />
+
+                <TextView
+                    android:id="@+id/mvFullCast"
+                    android:layout_width="match_parent"
+                    android:layout_height="24dp"
+                    android:layout_marginTop="7dp"
+                    android:gravity="center"
+                    android:includeFontPadding="false"
+                    android:background="@drawable/mv_glass_button"
+                    android:focusable="true"
+                    android:clickable="true"
+                    android:text="@string/mv_full_cast"
+                    android:textColor="@color/hero_btn_fg"
+                    android:textSize="10.5sp"
+                    android:fontFamily="@font/ui"
+                    android:fontVariationSettings="'wght' 500, 'opsz' 17"
+                    android:nextFocusUp="@+id/btnWifi" />
+            </LinearLayout>
+        </FrameLayout>
+
         <LinearLayout
             android:id="@+id/rows"
             android:layout_width="match_parent"
@@ -230,9 +456,21 @@
             android:clipToPadding="false"
             android:orientation="vertical">
 
+            <!-- 0 Similar movies (posters), 1 Your Apps, 2 Continue Watching, 3 Wishlist (posters), 4 All Apps.
+                 Empty rows are hidden. -->
+            <TextView
+                android:id="@+id/row0Title"
+                style="@style/HeroRowTitle" />
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/row0"
+                style="@style/HeroRow"
+                android:layout_height="210dp" />
+
             <TextView
                 android:id="@+id/row1Title"
-                style="@style/HeroRowTitle" />
+                style="@style/HeroRowTitle"
+                android:layout_marginTop="2dp" />
 
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/row1"
@@ -254,6 +492,16 @@
 
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/row3"
+                style="@style/HeroRow"
+                android:layout_height="210dp" />
+
+            <TextView
+                android:id="@+id/row4Title"
+                style="@style/HeroRowTitle"
+                android:layout_marginTop="2dp" />
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/row4"
                 style="@style/HeroRow" />
         </LinearLayout>
     </FrameLayout>

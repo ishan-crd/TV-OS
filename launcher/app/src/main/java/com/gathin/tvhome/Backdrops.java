@@ -109,6 +109,12 @@ final class Backdrops {
         });
     }
 
+    /** Builds an image backdrop in the background so a later getImage() is instant. */
+    void preloadImage(String uri) {
+        String key = "img:" + uri;
+        if (cache.get(key) == null && !pending.containsKey(key)) getImage(uri, (k, b) -> { });
+    }
+
     /** Builds it in the background so a later get() is instant. */
     void preload(AppAdapter.Entry e) {
         if (cache.get(e.pkg) == null && !pending.containsKey(e.pkg)) get(e, (p, b) -> { });

@@ -27,6 +27,17 @@ final class RowAdapter extends RecyclerView.Adapter<RowAdapter.Holder> {
         final String caption;
         final AppAdapter.Entry app;
         final WatchNext.Program show;
+        /** A title from TMDB (Similar, Wishlist): a poster card that opens its details in the hero. */
+        final Tmdb.Brief brief;
+
+        Item(Tmdb.Brief b) {
+            this.key = b.key();
+            this.title = b.title;
+            this.caption = b.year;
+            this.app = null;
+            this.show = null;
+            this.brief = b;
+        }
 
         Item(AppAdapter.Entry app, String caption) {
             this.key = app.component.flattenToShortString();
@@ -34,6 +45,7 @@ final class RowAdapter extends RecyclerView.Adapter<RowAdapter.Holder> {
             this.caption = caption;
             this.app = app;
             this.show = null;
+            this.brief = null;
         }
 
         Item(WatchNext.Program show, AppAdapter.Entry app) {
@@ -42,6 +54,7 @@ final class RowAdapter extends RecyclerView.Adapter<RowAdapter.Holder> {
             this.caption = show.episode != null ? show.episode : app != null ? app.label : null;
             this.app = app;
             this.show = show;
+            this.brief = null;
         }
     }
 
@@ -62,9 +75,17 @@ final class RowAdapter extends RecyclerView.Adapter<RowAdapter.Holder> {
     private final Listener listener;
     private final List<Item> items = new ArrayList<>();
 
+    /** Portrait poster cards (TMDB titles) instead of 16:9 ones. */
+    private final boolean portrait;
+
     RowAdapter(int row, Listener listener) {
+        this(row, listener, false);
+    }
+
+    RowAdapter(int row, Listener listener, boolean portrait) {
         this.row = row;
         this.listener = listener;
+        this.portrait = portrait;
         setHasStableIds(true);
     }
 
@@ -96,7 +117,7 @@ final class RowAdapter extends RecyclerView.Adapter<RowAdapter.Holder> {
     @NonNull
     @Override
     public Holder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        return new Holder(LayoutInflater.from(parent.getContext()).inflate(R.layout.item_hero_card, parent, false));
+        return new Holder(LayoutInflater.from(parent.getContext()).inflate(portrait ? R.layout.item_hero_poster : R.layout.item_hero_card, parent, false));
     }
 
     @Override
@@ -109,7 +130,18 @@ final class RowAdapter extends RecyclerView.Adapter<RowAdapter.Holder> {
         h.card.setScaleX(focused ? FOCUS_SCALE : 1f);
         h.card.setScaleY(focused ? FOCUS_SCALE : 1f);
 
-        if (it.show != null) {
+        if (it.brief != null) {
+            h.progressTrack.setVisibility(View.GONE);
+            h.banner.setImageDrawable(null);
+            h.banner.setVisibility(View.VISIBLE);
+            showFallback(h, null, it.title);
+            final String key = it.key;
+            Posters.get(h.itemView.getContext()).load(Tmdb.IMG + "w342" + it.brief.poster, 240, 360, (uri, bmp) -> {
+                if (bmp == null || !key.equals(h.boundKey)) return;
+                h.banner.setImageBitmap(bmp);
+                h.label.setVisibility(View.GONE);
+            });
+        } else if (it.show != null) {
             // Poster, loaded in the background; the app's icon and the title stand in until it arrives.
             h.banner.setImageDrawable(null);
             h.banner.setVisibility(View.VISIBLE);
