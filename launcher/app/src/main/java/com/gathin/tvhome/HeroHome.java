@@ -156,7 +156,7 @@ final class HeroHome implements RowAdapter.Listener {
         logos.clear();
         for (AppAdapter.Entry e : slides) {
             texts.put(e.pkg, new String[]{
-                    act.getString(R.string.hero_app) + " · " + category(e.pkg), recency(e.pkg), tagline(e.pkg)});
+                    act.getString(R.string.hero_app) + " ·", category(e.pkg), tagline(e.pkg)});
             Bitmap l = customLogo(e.pkg);
             if (l != null) logos.put(e.pkg, l);
         }
@@ -298,10 +298,11 @@ final class HeroHome implements RowAdapter.Listener {
         }
         String[] t = texts.get(e.pkg);
         if (t == null) t = new String[]{act.getString(R.string.hero_app), null, null};
+        // "App ·" then the category in the outlined badge: App · [VIDEO].
         meta.setText(t[0]);
-        String when = t[1];
-        badge.setVisibility(when == null ? View.GONE : View.VISIBLE);
-        badge.setText(when);
+        String category = t[1];
+        badge.setVisibility(category == null ? View.GONE : View.VISIBLE);
+        badge.setText(category);
         String line = t[2];
         tagline.setVisibility(line == null ? View.GONE : View.VISIBLE);
         tagline.setText(line);
@@ -590,7 +591,7 @@ final class HeroHome implements RowAdapter.Listener {
         texts.clear();
         for (AppAdapter.Entry e : slides) {
             texts.put(e.pkg, new String[]{
-                    act.getString(R.string.hero_app) + " · " + category(e.pkg), recency(e.pkg), tagline(e.pkg)});
+                    act.getString(R.string.hero_app) + " ·", category(e.pkg), tagline(e.pkg)});
         }
         showSlide(i, 0);
         if (row < 0 || row >= ROWS) return;
