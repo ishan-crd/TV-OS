@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.TvHome" parent="android:Theme.Material.NoActionBar.Fullscreen">
+        <item name="android:windowBackground">@android:color/black</item>
+        <item name="android:colorBackground">@android:color/black</item>
+        <item name="android:windowAnimationStyle">@null</item>
+    </style>
+
+    <!-- Frosted pill, tvOS style. -->
+    <style name="TopButtonBase">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">42dp</item>
+        <item name="android:layout_marginStart">10dp</item>
+        <item name="android:paddingStart">16dp</item>
+        <item name="android:paddingEnd">20dp</item>
+        <item name="android:gravity">center</item>
+        <item name="android:background">@drawable/pill_bg</item>
+        <item name="android:textColor">@drawable/pill_text</item>
+        <item name="android:textSize">15sp</item>
+        <item name="android:fontFamily">@font/outfit</item>
+        <item name="android:letterSpacing">0.01</item>
+        <item name="android:drawablePadding">9dp</item>
+        <item name="android:drawableTint">@drawable/pill_text</item>
+        <item name="android:focusable">true</item>
+        <item name="android:clickable">true</item>
+    </style>
+    <style name="TopButton" parent="TopButtonBase" />
+
+    <!-- Rivulet-style home (activity_hero.xml). -->
+    <style name="HeroTopButton">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">30dp</item>
+        <item name="android:layout_marginStart">8dp</item>
+        <item name="android:paddingStart">12dp</item>
+        <item name="android:paddingEnd">14dp</item>
+        <item name="android:gravity">center</item>
+        <item name="android:includeFontPadding">false</item>
+        <item name="android:background">@drawable/hero_glass_pill</item>
+        <item name="android:textColor">@color/hero_btn_fg</item>
+        <item name="android:textSize">13sp</item>
+        <item name="android:fontFamily">@font/ui</item>
+        <item name="android:fontVariationSettings">\'wght\' 600, \'opsz\' 17</item>
+        <item name="android:drawablePadding">6dp</item>
+        <item name="android:drawableTint">@color/hero_btn_fg</item>
+        <item name="android:focusable">true</item>
+        <item name="android:clickable">true</item>
+    </style>
+    <style name="HeroRowTitle">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginStart">40dp</item>
+        <item name="android:includeFontPadding">false</item>
+        <item name="android:textColor">#FFFFFFFF</item>
+        <item name="android:textSize">19sp</item>
+        <item name="android:fontFamily">@font/ui</item>
+        <item name="android:fontVariationSettings">\'wght\' 600, \'opsz\' 28</item>
+    </style>
+    <style name="HeroRow">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">138dp</item>
+        <item name="android:layout_marginTop">8dp</item>
+        <item name="android:paddingStart">40dp</item>
+        <item name="android:paddingEnd">40dp</item>
+        <item name="android:clipToPadding">false</item>
+        <item name="android:clipChildren">false</item>
+        <item name="android:overScrollMode">never</item>
+        <item name="android:scrollbars">none</item>
+        <item name="android:descendantFocusability">afterDescendants</item>
+    </style>
+</resources>

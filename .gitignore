@@ -1,0 +1,14 @@
+# Python tools
+tools/venv/
+tools/adbkey/
+tools/__pycache__/
+# Android build
+launcher/.gradle/
+launcher/build/
+launcher/app/build/
+launcher/local.properties
+# Local font override (e.g. SF Pro, which Apple licenses for Apple-platform mockups only): never committed
+launcher/app/src/release/res/font/
+# Your TV's dumps and personal notes stay local
+backup/
+.DS_Store

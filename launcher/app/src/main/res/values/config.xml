@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Launcher configuration. Edit this file, then run launcher/build-and-install.sh.
+  Package names: on the TV run `pm list packages` (tools/tv.py 'pm list packages').
+-->
+<resources>
+
+    <!-- Home style. true: Rivulet-like hero (full-screen artwork of the current dock app, rows below).
+         false: the classic black tvOS dock and grid. Custom artwork per app: push an image to
+         /sdcard/Android/data/com.gathin.tvhome/files/backdrops/<package>.jpg (and logos/<package>.png). -->
+    <bool name="hero_home">true</bool>
+
+    <!-- Apps pinned to the dock row at the bottom, in this order. Missing apps are skipped. -->
+    <string-array name="dock_apps">
+        <item>com.netflix.ninja</item>
+        <item>com.amazon.amazonvideo.livingroom</item>
+        <item>com.google.android.youtube.tv</item>
+        <item>in.startv.hotstar</item>
+    </string-array>
+
+    <!-- Remote buttons the Input-key service (INPUT_KEY_SERVICE=1) takes over: KEYCODE_NAME=target, or
+         KEYCODE_NAME:scancode=target when one key code serves several buttons. Target: a package to open,
+         @inputs (input switcher), @settings, @home (this launcher), or empty to swallow the key. Philips/Skyworth
+         eleonas: its global-key handler for these keys crashes while the stock launcher is disabled, so they
+         must not reach it. ENDCALL is both the Input button (scan 383) and the custom button (scan 176). The Settings button
+         sends NOTIFICATION (scan 240), which opened Google TV's panel in the stock launcher, so it is sent
+         to system Settings instead. -->
+    <string-array name="remote_app_keys">
+        <item>KEYCODE_ENDCALL:383=@inputs</item>
+        <item>KEYCODE_ENDCALL:176=in.startv.hotstar</item>
+        <item>KEYCODE_ENDCALL=</item>
+        <item>KEYCODE_NOTIFICATION=@settings</item>
+        <item>KEYCODE_SETTINGS=@settings</item>
+        <item>KEYCODE_MACRO_2=</item>
+        <item>KEYCODE_MACRO_3=</item>
+        <item>KEYCODE_MACRO_4=</item>
+    </string-array>
+
+    <!-- Hero home: the first row ("Your Apps"), in this order. Leave it empty for a "Recently Used" row. -->
+    <string-array name="your_apps">
+        <item>in.startv.hotstar</item>
+        <item>com.amazon.amazonvideo.livingroom</item>
+        <item>com.netflix.ninja</item>
+        <item>com.google.android.youtube.tv</item>
+    </string-array>
+
+    <!-- Apps never shown as tiles (e.g. the Live TV app, which the Inputs menu already covers). -->
+    <string-array name="hidden_apps">
+        <item>com.cltv.hybrid</item>
+        <item>com.mitv.gallery</item>
+    </string-array>
+
+    <!-- The TV's Live TV / tuner app, offered at the end of the Inputs menu. Leave empty to omit. -->
+    <string name="live_tv_package" translatable="false">com.cltv.hybrid</string>
+
+    <!-- Show the Solar Hijri (Shamsi) date used in Iran and Afghanistan, e.g. "27 Mehr 1405", above the
+         Gregorian date. -->
+    <bool name="shamsi_date">false</bool>
+    <!-- Optional VPN app the network pill opens (hold the pill for Wi-Fi settings), e.g. the package of the
+         VPN you use. Empty: the pill opens Wi-Fi settings. The VPN badge shows for any VPN either way. -->
+    <string name="vpn_app" translatable="false"></string>
+    <!-- Grid rows left visible under the dock on the home screen. 0 = dock sits at the very bottom. -->
+    <integer name="rows_below_dock">0</integer>
+
+    <!-- Tiles per row in the grid; the dock always has this many slots. Tiles are 180dp wide at 4 columns and
+         shrink to fit from 5 up (about 144dp at 5, 117dp at 6 on a 1080p TV). -->
+    <integer name="columns">4</integer>
+
+    <!-- "Default home" tile that opens Android's home-screen picker, for TVs whose settings have one
+         (most Android TVs don't; the tile only appears when the page exists). Off by default. -->
+    <bool name="show_home_settings_shortcut">false</bool>
+</resources>

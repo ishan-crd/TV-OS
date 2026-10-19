@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_focused="true">
+        <shape android:shape="oval">
+            <solid android:color="#FFFFFFFF" />
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="oval">
+            <gradient android:angle="270" android:startColor="#47FFFFFF" android:endColor="#2EFFFFFF" />
+            <stroke android:width="0.5dp" android:color="#40FFFFFF" />
+        </shape>
+    </item>
+</selector>
