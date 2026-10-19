@@ -44,6 +44,7 @@
         <item>com.amazon.amazonvideo.livingroom</item>
         <item>com.netflix.ninja</item>
         <item>com.google.android.youtube.tv</item>
+        <item>com.spotify.tv.android</item>
     </string-array>
 
     <!-- Quick panel "Screen mirroring" tile: the AirPlay/mirroring receiver app to open (e.g. iMirror,
