@@ -49,6 +49,13 @@
     <string name="cat_productivity">Productivity</string>
     <string name="cat_tv">TV</string>
     <string name="qp_all_settings">All settings</string>
+    <string name="qp_running_apps">Running apps</string>
+    <string name="ra_title">Running apps</string>
+    <string name="ra_memory">%1$s of %2$s in use</string>
+    <string name="ra_freed">Freed %1$d MB</string>
+    <string name="ra_empty">No apps open in the background</string>
+    <string name="ra_clear_all">Clear all</string>
+    <string name="ra_close">Close</string>
     <string name="qp_screensaver">Screensaver</string>
     <string name="qp_picture">Picture</string>
     <string name="qp_sound">Sound</string>

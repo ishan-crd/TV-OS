@@ -33,6 +33,10 @@ install tools and debloat approach it builds on. The home screen design is inspi
   Bluetooth (Remotes & Accessories), Display mode and Accessibility. It slides in from the right over
   whatever is playing, and nothing of it runs while it's closed. Bluetooth's page is one Settings won't
   open for other apps, so the remote-key service selects it inside Settings (it only watches Settings).
+- **Running apps** (last tile of the quick panel): the apps you opened since the TV started, memory in
+  use, ✕ per app and **Clear all**. Closing is a real force stop, which Android only allows the system,
+  so the remote-key service presses Force stop → OK on each app's Settings page (about a second per app)
+  and returns you to the panel with the memory freed. The TV's own system apps aren't listed or stopped.
 - **Night mode**: from 22:00 to 06:00 the artwork is dimmed (`night_*` in config.xml).
 - **Clock screensaver** that drifts every 30 seconds so nothing burns in.
 - **Top bar**: a Home pill, the clock and a glass **Wi-Fi** pill showing the network name. Inputs and

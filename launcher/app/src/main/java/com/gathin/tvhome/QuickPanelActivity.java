@@ -65,6 +65,8 @@ public class QuickPanelActivity extends Activity {
                                 new Intent(Settings.ACTION_DISPLAY_SETTINGS))},
                 {R.drawable.ic_qp_accessibility, R.string.qp_accessibility, null,
                         (Action) () -> go(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))},
+                {R.drawable.ic_qp_apps, R.string.qp_running_apps, null,
+                        (Action) () -> go(new Intent(this, RunningAppsActivity.class))},
         };
         int gap = Math.round(8 * getResources().getDisplayMetrics().density);
         for (int i = 0; i < items.length; i++) {
@@ -87,6 +89,7 @@ public class QuickPanelActivity extends Activity {
             final Action action = (Action) items[i][3];
             tile.setOnClickListener(v -> action.run());
             if (i % 2 == 1) ((LinearLayout.LayoutParams) tile.getLayoutParams()).setMarginStart(gap);
+            // An odd last tile (Running apps) is alone in its row, so it spans it.
             // The top row's Up goes to All settings; nothing else leaves the panel.
             if (i < 2) tile.setNextFocusUpId(R.id.qpAllSettings);
             tile.setId(View.generateViewId());

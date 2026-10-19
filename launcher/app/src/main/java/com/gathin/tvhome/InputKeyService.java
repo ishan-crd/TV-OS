@@ -34,6 +34,23 @@ public class InputKeyService extends AccessibilityService {
     private long pendingUntil;
     private int pendingScrolls;
 
+    // Force stop, one app at a time: its info page, "Force stop", then "OK" in the confirmation.
+    private final java.util.ArrayDeque<String> stopQueue = new java.util.ArrayDeque<>();
+    private String stopping;
+    /** 0: waiting for the app's page, 1: waiting for the confirmation, 2: confirmed. */
+    private int stopStep;
+    private long stopDeadline;
+    private Runnable stopsDone;
+    private final android.os.Handler handler = new android.os.Handler(android.os.Looper.getMainLooper());
+    private final Runnable stopWatchdog = new Runnable() {
+        @Override
+        public void run() {
+            if (stopping == null) return;
+            if (System.currentTimeMillis() > stopDeadline) nextStop();   // stuck: skip this app
+            else handler.postDelayed(this, 500);
+        }
+    };
+
     /** "keyCode" or "keyCode:scanCode" → target; an empty target swallows the key. */
     private final Map<String, String> appKeys = new HashMap<>();
 
@@ -120,8 +137,86 @@ public class InputKeyService extends AccessibilityService {
         return true;
     }
 
+    /**
+     * Force-stops these apps through their Settings pages (the only way for an app that isn't part of the
+     * system), then runs `done`. False when the service isn't running.
+     */
+    static boolean forceStop(java.util.List<String> pkgs, Runnable done) {
+        InputKeyService s = instance;
+        if (s == null) return false;
+        s.stopQueue.clear();
+        s.stopQueue.addAll(pkgs);
+        s.stopsDone = done;
+        s.nextStop();
+        return true;
+    }
+
+    private void nextStop() {
+        stopping = stopQueue.poll();
+        if (stopping == null) {
+            handler.removeCallbacks(stopWatchdog);
+            Runnable done = stopsDone;
+            stopsDone = null;
+            if (done != null) done.run();
+            return;
+        }
+        stopStep = 0;
+        stopDeadline = System.currentTimeMillis() + 5000;
+        open(new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                android.net.Uri.parse("package:" + stopping)));
+        handler.removeCallbacks(stopWatchdog);
+        handler.postDelayed(stopWatchdog, 500);
+    }
+
+    private void stepStop(android.view.accessibility.AccessibilityNodeInfo root) {
+        if (stopStep == 0) {
+            if (findExact(root, "OK") != null) return;   // a confirmation from before is still closing
+            android.view.accessibility.AccessibilityNodeInfo n = clickable(findExact(root, "Force stop"));
+            if (n == null) {
+                // The page is up (it has "Open") but no Force stop: the app isn't running. Next one.
+                if (findExact(root, "Open") != null && findExact(root, "Uninstall") != null
+                        || findExact(root, "Open") != null && findExact(root, "Storage used") != null) nextStop();
+                return;
+            }
+            if (!n.isEnabled()) {   // already stopped
+                nextStop();
+                return;
+            }
+            stopStep = 1;
+            n.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK);
+        } else if (stopStep == 1) {
+            android.view.accessibility.AccessibilityNodeInfo ok = clickable(findExact(root, "OK"));
+            if (ok == null) return;
+            stopStep = 2;
+            ok.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK);
+            handler.postDelayed(this::nextStop, 350);
+        }
+    }
+
+    private static android.view.accessibility.AccessibilityNodeInfo clickable(android.view.accessibility.AccessibilityNodeInfo n) {
+        while (n != null && !n.isClickable()) n = n.getParent();
+        return n;
+    }
+
+    private static android.view.accessibility.AccessibilityNodeInfo findExact(
+            android.view.accessibility.AccessibilityNodeInfo node, String text) {
+        if (node == null) return null;
+        CharSequence t = node.getText();
+        if (t != null && t.toString().trim().equalsIgnoreCase(text)) return node;
+        for (int i = 0; i < node.getChildCount(); i++) {
+            android.view.accessibility.AccessibilityNodeInfo hit = findExact(node.getChild(i), text);
+            if (hit != null) return hit;
+        }
+        return null;
+    }
+
     @Override
     public void onAccessibilityEvent(AccessibilityEvent event) {
+        if (stopping != null) {
+            android.view.accessibility.AccessibilityNodeInfo root = getRootInActiveWindow();
+            if (root != null) stepStop(root);
+            return;
+        }
         if (pendingEntry == null) return;
         if (System.currentTimeMillis() > pendingUntil) {
             pendingEntry = null;
