@@ -14,6 +14,7 @@ import java.util.List;
 final class Prefs {
 
     static final String YOUR_APPS = "your_apps", FEATURED = "featured";
+    private static final String HIDDEN_SHOWS = "hidden_shows";
 
     private Prefs() {
     }
@@ -37,5 +38,31 @@ final class Prefs {
 
     static void save(Context c, String name, List<String> pkgs) {
         sp(c).edit().putString(name, String.join(",", pkgs)).apply();
+    }
+
+    /**
+     * Shows removed from Continue Watching, with the time they were removed. The launcher can't delete
+     * another app's Watch Next entry, so it hides it; watching the show again (a newer engagement time
+     * from its app) brings it back.
+     */
+    static java.util.Map<String, Long> hiddenShows(Context c) {
+        java.util.Map<String, Long> out = new java.util.HashMap<>();
+        for (String e : sp(c).getStringSet(HIDDEN_SHOWS, new java.util.HashSet<>())) {
+            int bar = e.indexOf('|');
+            if (bar <= 0) continue;
+            try {
+                out.put(e.substring(bar + 1), Long.parseLong(e.substring(0, bar)));
+            } catch (NumberFormatException ignored) {
+            }
+        }
+        return out;
+    }
+
+    static void hideShow(Context c, String showKey) {
+        java.util.Map<String, Long> hidden = hiddenShows(c);
+        hidden.put(showKey, System.currentTimeMillis());
+        java.util.Set<String> set = new java.util.HashSet<>();
+        for (java.util.Map.Entry<String, Long> e : hidden.entrySet()) set.add(e.getValue() + "|" + e.getKey());
+        sp(c).edit().putStringSet(HIDDEN_SHOWS, set).apply();
     }
 }

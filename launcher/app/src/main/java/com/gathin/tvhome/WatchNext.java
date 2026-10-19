@@ -38,6 +38,11 @@ final class WatchNext {
         String key() {
             return pkg + "|" + title + "|" + episode;
         }
+
+        /** Identity for hiding: the show, whichever episode is up next. */
+        String showKey() {
+            return pkg + "|" + title;
+        }
     }
 
     private static final String[] COLUMNS = {
@@ -66,6 +71,7 @@ final class WatchNext {
         List<Program> out = new ArrayList<>();
         if (!permitted(c)) return out;
         Set<String> seen = new HashSet<>();
+        java.util.Map<String, Long> hidden = Prefs.hiddenShows(c);
         try (Cursor cur = c.getContentResolver().query(TvContract.WatchNextPrograms.CONTENT_URI, COLUMNS, null, null,
                 TvContract.WatchNextPrograms.COLUMN_LAST_ENGAGEMENT_TIME_UTC_MILLIS + " DESC")) {
             if (cur == null) return out;
@@ -77,11 +83,14 @@ final class WatchNext {
                 if (number != null) episode = (season != null ? "S" + season + " " : "") + "E" + number;
                 if (epTitle != null && !epTitle.isEmpty()) episode = episode == null ? epTitle : episode + " · " + epTitle;
                 if (!seen.add(pkg + "|" + title)) continue;
+                long engaged = cur.getLong(8);
+                Long hiddenAt = hidden.get(pkg + "|" + title);
+                if (hiddenAt != null && engaged <= hiddenAt) continue;   // removed, and not watched since
                 String poster = cur.getString(5);
                 if (poster == null || poster.isEmpty()) poster = cur.getString(6);
                 long duration = cur.getLong(9), position = cur.getLong(10);
                 float progress = duration > 0 && position > 0 ? Math.min(1f, position / (float) duration) : 0f;
-                out.add(new Program(pkg, title, episode, poster, cur.getString(7), cur.getLong(8), progress));
+                out.add(new Program(pkg, title, episode, poster, cur.getString(7), engaged, progress));
             }
         } catch (Exception e) {
             Log.w("WatchNext", "query failed", e);

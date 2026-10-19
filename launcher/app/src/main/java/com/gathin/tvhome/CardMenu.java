@@ -46,8 +46,15 @@ final class CardMenu {
         String appKey = app.component.flattenToShortString();
 
         if (it.show != null) {
+            // A show card is about the show only: resume it or take it out of Continue Watching.
             add(act, rows, popup, R.drawable.ic_play, act.getString(R.string.menu_resume, it.title),
                     () -> WatchNext.open(act, it.show, app));
+            add(act, rows, popup, R.drawable.ic_info_outline, act.getString(R.string.menu_remove_continue), () -> {
+                Prefs.hideShow(act, it.show.showKey());
+                onChanged.changed(it.key);
+            });
+            place(act, root, popup, panel, rows, card, density);
+            return;
         }
         add(act, rows, popup, R.drawable.ic_play, act.getString(R.string.menu_open, app.label),
                 () -> AppAdapter.launch(act, app));
@@ -96,9 +103,17 @@ final class CardMenu {
         }
         add(act, rows, popup, R.drawable.ic_settings, act.getString(R.string.hero_info),
                 () -> AppAdapter.openAppInfo(act, app));
+        place(act, root, popup, panel, rows, card, density);
+    }
 
+    private static void place(Activity act, ViewGroup root, PopupWindow popup, View panel, LinearLayout rows,
+                              View card, float density) {
         // Under the card, or above it when there isn't room below.
-        panel.measure(View.MeasureSpec.makeMeasureSpec(popup.getWidth(), View.MeasureSpec.EXACTLY),
+        // As wide as the longest option needs, between 240 and 380 dp.
+        panel.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED);
+        int width = Math.max(Math.round(240 * density), Math.min(Math.round(380 * density), panel.getMeasuredWidth()));
+        popup.setWidth(width);
+        panel.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
                 View.MeasureSpec.UNSPECIFIED);
         Rect r = new Rect();
         card.getGlobalVisibleRect(r);

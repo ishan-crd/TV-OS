@@ -56,4 +56,5 @@
     <string name="menu_move_right">Move right</string>
     <string name="menu_add_featured">Add to Featured</string>
     <string name="menu_remove_featured">Remove from Featured</string>
+    <string name="menu_remove_continue">Remove from Continue Watching</string>
 </resources>

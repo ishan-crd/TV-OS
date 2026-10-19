@@ -600,8 +600,14 @@ final class HeroHome implements RowAdapter.Listener {
         if (row < 0 || row >= ROWS) return;
         int r = row, pos = adapters[row].positionOf(focusKey);
         if (pos < 0) {
-            r = row == 0 ? (adapters[0].getItemCount() > 0 ? 0 : nextRow(0, 1)) : row;
-            pos = 0;
+            // The card is gone (removed): stay at the same place in its row, or move to the next row.
+            if (adapters[row].getItemCount() > 0) {
+                pos = Math.min(lastRowPos, adapters[row].getItemCount() - 1);
+            } else {
+                r = nextRow(row, 1);
+                if (r < 0) r = nextRow(row, -1);
+                pos = 0;
+            }
         }
         if (r < 0) {
             exitRows(true);
