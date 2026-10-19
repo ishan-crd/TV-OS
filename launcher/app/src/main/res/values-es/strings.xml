@@ -4,9 +4,7 @@
     <string name="inputs">Entradas</string>
     <string name="wifi">Wi-Fi</string>
     <string name="settings">Ajustes</string>
-    <string name="choose_input">Entradas</string>
     <string name="connected">Conectado</string>
-    <string name="standby">En espera</string>
     <string name="not_connected">Sin dispositivo</string>
     <string name="live_tv">TV en vivo</string>
     <string name="no_inputs">No se encontraron entradas</string>

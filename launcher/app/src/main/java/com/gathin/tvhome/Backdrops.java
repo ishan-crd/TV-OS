@@ -113,6 +113,14 @@ final class Backdrops {
         });
     }
 
+    /**
+     * Frees memory while the home screen is hidden (an app is open): keeps only the most recent few
+     * backdrops, or none when Android is short of memory. The one on screen stays held by its view.
+     */
+    void trim(boolean all) {
+        cache.trimToSize(all ? 0 : 2);
+    }
+
     /** Builds an image backdrop in the background so a later getImage() is instant. */
     void preloadImage(String uri) {
         if (uri == null) return;

@@ -96,6 +96,11 @@ final class Posters {
         });
     }
 
+    /** Drops the in-memory posters; they come back from the disk cache when the row is shown again. */
+    void trimMemory() {
+        mem.evictAll();
+    }
+
     /** Blocking, any thread: the image decoded to at least about this size, or null. */
     Bitmap decode(String uri, int reqW, int reqH) {
         try {

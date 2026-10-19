@@ -332,6 +332,12 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     }
 
     @Override
+    public void onTrimMemory(int level) {
+        super.onTrimMemory(level);
+        if (hero != null) hero.trimMemory(level);
+    }
+
+    @Override
     protected void onDestroy() {
         super.onDestroy();
         ConnectivityManager cm = getSystemService(ConnectivityManager.class);

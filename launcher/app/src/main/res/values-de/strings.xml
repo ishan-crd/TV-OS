@@ -4,9 +4,7 @@
     <string name="inputs">Quellen</string>
     <string name="wifi">WLAN</string>
     <string name="settings">Einstellungen</string>
-    <string name="choose_input">Quellen</string>
     <string name="connected">Verbunden</string>
-    <string name="standby">Standby</string>
     <string name="not_connected">Kein Gerät</string>
     <string name="live_tv">Live TV</string>
     <string name="no_inputs">Keine Quellen gefunden</string>

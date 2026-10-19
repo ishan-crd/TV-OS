@@ -37,24 +37,6 @@
     </style>
 
     <!-- Rivulet-style home (activity_hero.xml). -->
-    <style name="HeroTopButton">
-        <item name="android:layout_width">wrap_content</item>
-        <item name="android:layout_height">30dp</item>
-        <item name="android:layout_marginStart">8dp</item>
-        <item name="android:paddingStart">12dp</item>
-        <item name="android:paddingEnd">14dp</item>
-        <item name="android:gravity">center</item>
-        <item name="android:includeFontPadding">false</item>
-        <item name="android:background">@drawable/hero_glass_pill</item>
-        <item name="android:textColor">@color/hero_btn_fg</item>
-        <item name="android:textSize">13sp</item>
-        <item name="android:fontFamily">@font/ui</item>
-        <item name="android:fontVariationSettings">\'wght\' 600, \'opsz\' 17</item>
-        <item name="android:drawablePadding">6dp</item>
-        <item name="android:drawableTint">@color/hero_btn_fg</item>
-        <item name="android:focusable">true</item>
-        <item name="android:clickable">true</item>
-    </style>
     <!-- A bare icon in the hero's top bar; a white circle (and a dark icon) only when focused. -->
     <style name="HeroTopIcon">
         <item name="android:layout_width">30dp</item>

@@ -48,7 +48,7 @@ final class HeroHome implements RowAdapter.Listener {
     private final Backdrops backdrops;
 
     private final ImageView backA, backB;
-    private final View dim, page, heroText, buttons, btnOpen, btnInfo, btnNext;
+    private final View page, heroText, buttons, btnOpen, btnInfo, btnNext;
     private final ImageView logo;
     private final TextView title, meta, badge, tagline;
     private final DotsView dots;
@@ -74,6 +74,9 @@ final class HeroHome implements RowAdapter.Listener {
     private final Map<String, AppAdapter.Entry> apps = new HashMap<>();
     /** Extra darkening of the artwork at night (config.xml night_*), 0 by day. */
     private float nightDim;
+    /** How dark the artwork is drawn now (0..1), and the animation moving it. */
+    private float dimLevel;
+    private android.animation.ValueAnimator dimAnim;
 
     private final Runnable autoAdvance = new Runnable() {
         @Override
@@ -93,7 +96,6 @@ final class HeroHome implements RowAdapter.Listener {
         logoDir = act.getExternalFilesDir("logos");
         backA = act.findViewById(R.id.backA);
         backB = act.findViewById(R.id.backB);
-        dim = act.findViewById(R.id.dim);
         page = act.findViewById(R.id.page);
         heroText = act.findViewById(R.id.heroText);
         buttons = act.findViewById(R.id.buttons);
@@ -244,6 +246,15 @@ final class HeroHome implements RowAdapter.Listener {
     void onPause() {
         handler.removeCallbacks(autoAdvance);
         handler.removeCallbacks(rowBackdrop);
+    }
+
+    /** onTrimMemory: lets the artwork caches go while an app is in front, all of it when memory is short. */
+    void trimMemory(int level) {
+        if (level < android.content.ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL) return;
+        boolean all = level >= android.content.ComponentCallbacks2.TRIM_MEMORY_BACKGROUND
+                || level == android.content.ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL;
+        backdrops.trim(all);
+        Posters.get(act).trimMemory();
     }
 
     /** Back: from the rows to the hero. Returns true when handled. */
@@ -653,17 +664,31 @@ final class HeroHome implements RowAdapter.Listener {
         applyDim(animate ? 1200 : 0);
     }
 
-    /** The dim layer over the artwork: the night setting, or half while the rows are up, whichever is darker. */
+    /**
+     * Darkens the artwork: the night setting, or a little while the rows are up, whichever is darker.
+     * Done as a colour filter on the backdrop images rather than a black layer over the whole screen,
+     * so the GPU doesn't fill every pixel a second time on each frame.
+     */
     private void applyDim(long duration) {
         // Light while the rows are up, so the focused title's artwork shows (the bottom is dark already).
         float target = Math.max(nightDim, inRows ? 0.15f : 0f);
-        dim.animate().cancel();
-        if (target > 0f) {
-            dim.setVisibility(View.VISIBLE);
-            dim.animate().alpha(target).setDuration(duration).withEndAction(null).start();
-        } else {
-            dim.animate().alpha(0f).setDuration(duration).withEndAction(() -> dim.setVisibility(View.GONE)).start();
+        if (dimAnim != null) dimAnim.cancel();
+        if (duration <= 0) {
+            setDim(target);
+            return;
         }
+        dimAnim = android.animation.ValueAnimator.ofFloat(dimLevel, target);
+        dimAnim.setDuration(duration);
+        dimAnim.addUpdateListener(a -> setDim((float) a.getAnimatedValue()));
+        dimAnim.start();
+    }
+
+    private void setDim(float level) {
+        dimLevel = level;
+        android.graphics.ColorFilter f = level <= 0f ? null : new android.graphics.PorterDuffColorFilter(
+                Math.round(level * 255) << 24, android.graphics.PorterDuff.Mode.SRC_ATOP);
+        backA.setColorFilter(f);
+        backB.setColorFilter(f);
     }
 
     // ---- text ------------------------------------------------------------------------------------

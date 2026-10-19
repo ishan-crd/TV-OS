@@ -34,16 +34,14 @@ install tools and debloat approach it builds on. The home screen design is inspi
 - **Long-press any card** to edit from the sofa: add to or remove from Your Apps, move left or right, add
   to or remove from the featured carousel, resume a show, or open the app's info.
 - **Quick settings panel** on the remote's Settings button, laid out like Google TV's: date and time,
-  **All settings**, and tiles for Screensaver, Inputs, Picture, Sound, Wi-Fi (with the network name),
-  Bluetooth (Remotes & Accessories), Display mode and Accessibility. It slides in from the right over
+  **All settings**, and tiles for Wi-Fi (with the network name), Bluetooth (Remotes & Accessories),
+  Picture, Sound, Screensaver, Inputs, Display mode, Accessibility, AirPlay and Running apps. It slides in from the right over
   whatever is playing, and nothing of it runs while it's closed. Bluetooth opens Remotes &
   Accessories directly, as Google TV's panel does: Settings only shows that page to holders of
   `WRITE_SECURE_SETTINGS`, which the install script grants over adb (without it, the remote-key service
   selects the entry inside Settings). Pages open in a fresh task, so one Back returns home.
-  **Wi-Fi** shows the network list inside the panel, like Google TV's: the current network first
-  ("Connected"), then nearby ones by signal with a lock on secured ones, refreshed when a scan finishes.
-  Android lets only system apps join a network, so choosing one opens its password screen in Settings
-  (the remote-key service picks it in the list); "All Wi-Fi settings" opens the full page.
+  **Wi-Fi** opens the Wi-Fi page in Settings. (A network list inside the panel is built in but off:
+  `WIFI_LIST_IN_PANEL` in QuickPanelActivity.)
 - **AirPlay** tile: switches an AirPlay receiver on and off ("On · Bedroom" / "Off") so an iPhone, iPad or
   Mac can mirror to the TV, without ever opening the receiver app; long press opens its settings. The
   receiver is a separate app, [iMirror](https://github.com/prat3ik/iMirror) (GPL-3.0, kept out of this MIT
@@ -59,10 +57,12 @@ install tools and debloat approach it builds on. The home screen design is inspi
   so the remote-key service presses Force stop → OK on each app's Settings page (about a second per app)
   and returns you to the panel with the memory freed. The TV's own system apps aren't listed or stopped.
 - **Night mode**: from 22:00 to 06:00 the artwork is dimmed (`night_*` in config.xml).
+- **Light on memory**: artwork is decoded off the main thread at 2/3 screen size into small caches, which
+  are let go while an app is in front, so the home screen leaves the memory to whatever you're watching.
 - **Clock screensaver** that drifts every 30 seconds so nothing burns in, or a **photo screensaver** with
   your own pictures (see Configure).
-- **Top bar**: a Home pill, the clock and a glass **Wi-Fi** pill showing the network name. Inputs and
-  Settings are left to the remote's own buttons (see Remote buttons).
+- **Top bar**: a Home pill, then Wi-Fi and Bluetooth icons (each opens its Settings page) and the clock.
+  Inputs and Settings are left to the remote's own buttons (see Remote buttons).
 - The backdrop follows the focused card; rows that scroll under the top bar fade out; Back returns
   to the carousel.
 
