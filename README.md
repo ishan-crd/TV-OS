@@ -110,13 +110,14 @@ With the stock launcher disabled, some remote buttons lose their handler, and on
 handler crashes. `InputKeyService` (an accessibility service, enabled by `INPUT_KEY_SERVICE=1`) takes those
 keys first. In `remote_app_keys`, each item is `KEYCODE_NAME=target` or `KEYCODE_NAME:scancode=target`
 (when one key code serves several buttons); the target is a package to open, `@inputs`, `@settings`,
-`@panel` (quick settings panel), `@home`, or empty to swallow the key.
+`@panel` (quick settings panel), `@running` (running apps), `@home`, or empty to swallow the key.
 
 To see what a button sends: `tools/tv.py 'setprop log.tag.InputKeyService DEBUG'`, press it, then
 `tools/tv.py 'logcat -d | grep InputKeyService'`.
 
 **Philips Smart 4K TV (Skyworth, Google TV 14)**, which the defaults are set up for: Input sends
-`ENDCALL` scan 383, the programmable button `ENDCALL` scan 176, Settings sends `NOTIFICATION` (opens the quick panel).
+`ENDCALL` scan 383, the programmable button `ENDCALL` scan 176, the antenna button `ENDCALL` scan 439
+(opens Running apps), Settings sends `NOTIFICATION` (opens the quick panel).
 Skyworth's global-key service crashes on `ENDCALL`/`MACRO_2-4` while the stock launcher is disabled, and
 five crashes in a row make Android's RescueParty reset settings, so those keys must stay mapped. See
 [`devices/philips-smart-4k-google-tv/debloat.txt`](devices/philips-smart-4k-google-tv/debloat.txt).

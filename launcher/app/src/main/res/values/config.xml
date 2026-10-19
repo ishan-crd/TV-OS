@@ -20,14 +20,15 @@
 
     <!-- Remote buttons the Input-key service (INPUT_KEY_SERVICE=1) takes over: KEYCODE_NAME=target, or
          KEYCODE_NAME:scancode=target when one key code serves several buttons. Target: a package to open,
-         @inputs (input switcher), @panel (quick settings panel), @settings, @home (this launcher), or empty to swallow the key. Philips/Skyworth
+         @inputs (input switcher), @panel (quick settings panel), @running (running apps), @settings, @home (this launcher), or empty to swallow the key. Philips/Skyworth
          eleonas: its global-key handler for these keys crashes while the stock launcher is disabled, so they
-         must not reach it. ENDCALL is both the Input button (scan 383) and the custom button (scan 176). The Settings button
+         must not reach it. ENDCALL is the Input button (scan 383), the custom button (scan 176) and the antenna button (scan 439). The Settings button
          sends NOTIFICATION (scan 240), which opened Google TV's panel in the stock launcher; it opens this
          launcher's quick settings panel instead. -->
     <string-array name="remote_app_keys">
         <item>KEYCODE_ENDCALL:383=@inputs</item>
         <item>KEYCODE_ENDCALL:176=in.startv.hotstar</item>
+        <item>KEYCODE_ENDCALL:439=@running</item>
         <item>KEYCODE_ENDCALL=</item>
         <item>KEYCODE_NOTIFICATION=@panel</item>
         <item>KEYCODE_SETTINGS=@settings</item>

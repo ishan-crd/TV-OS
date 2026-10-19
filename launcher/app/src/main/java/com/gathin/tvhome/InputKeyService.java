@@ -100,6 +100,8 @@ public class InputKeyService extends AccessibilityService {
                     + " -> " + (target.isEmpty() ? "(none)" : target));
             if (target.equals("@inputs")) {
                 open(new Intent(ACTION_VIEW_INPUTS));
+            } else if (target.equals("@running")) {
+                open(new Intent(this, RunningAppsActivity.class));
             } else if (target.equals("@panel")) {
                 open(new Intent(this, QuickPanelActivity.class));
             } else if (target.equals("@settings")) {
