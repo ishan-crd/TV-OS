@@ -18,6 +18,11 @@ install tools and debloat approach it builds on. The home screen design is inspi
 - **Featured carousel** of your four dock apps over full-screen ambient artwork in each app's own colour,
   with the app's name, a line about it, an "App · Video · TODAY" line, a white **Open** button, info and
   next buttons, and page dots. It advances every 9 seconds.
+- **This week's artwork**: Netflix, Prime Video and JioHotstar show a still from what's popular on that
+  service in India this week ("Popular this week: …"), from TMDB's catalogue of what each service
+  offers; refreshed weekly and kept on the TV, so the home never waits on the network. Needs a free TMDB
+  key (themoviedb.org → Settings → API) as `tmdb.key=<key>` in `launcher/local.properties` (git-ignored);
+  apps and region are in `weekly_art` in config.xml. Without a key, apps keep their colour glow.
 - **Rows** that slide up when you press Down:
   - **Your Apps**: the apps you pick, in your order.
   - **Continue Watching**: the films and episodes you're part-way through, with posters and a progress

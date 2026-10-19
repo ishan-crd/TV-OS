@@ -6,7 +6,18 @@ android {
     namespace 'com.gathin.tvhome'
     compileSdk 34
 
+    // TMDB API key for the home's weekly artwork (what's popular on each streaming service). Kept out of
+    // git: put tmdb.key=<your key> in launcher/local.properties (free at themoviedb.org → Settings → API).
+    def localProps = new Properties()
+    def lp = rootProject.file('local.properties')
+    if (lp.exists()) lp.withInputStream { localProps.load(it) }
+
+    buildFeatures {
+        buildConfig true
+    }
+
     defaultConfig {
+        buildConfigField 'String', 'TMDB_KEY', '"' + (localProps.getProperty('tmdb.key') ?: '') + '"'
         applicationId 'com.gathin.tvhome'
         minSdk 26
         targetSdk 34

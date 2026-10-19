@@ -32,6 +32,7 @@
     <string name="hero_next">Next</string>
     <string name="hero_recent">Recently Used</string>
     <string name="hero_your_apps">Your Apps</string>
+    <string name="hero_this_week">Popular this week: %1$s</string>
     <string name="hero_continue">Continue Watching</string>
     <string name="hero_favourites">Favourites</string>
     <string name="hero_all_apps">All Apps</string>

@@ -158,7 +158,7 @@ final class HeroHome implements RowAdapter.Listener {
         logos.clear();
         for (AppAdapter.Entry e : slides) {
             texts.put(e.pkg, new String[]{
-                    act.getString(R.string.hero_app) + " ·", category(e.pkg), tagline(e.pkg)});
+                    act.getString(R.string.hero_app) + " ·", category(e.pkg), heroLine(e.pkg)});
             Bitmap l = customLogo(e.pkg);
             if (l != null) logos.put(e.pkg, l);
         }
@@ -613,7 +613,7 @@ final class HeroHome implements RowAdapter.Listener {
         texts.clear();
         for (AppAdapter.Entry e : slides) {
             texts.put(e.pkg, new String[]{
-                    act.getString(R.string.hero_app) + " ·", category(e.pkg), tagline(e.pkg)});
+                    act.getString(R.string.hero_app) + " ·", category(e.pkg), heroLine(e.pkg)});
         }
         showSlide(i, 0);
         if (row < 0 || row >= ROWS) return;
@@ -730,6 +730,12 @@ final class HeroHome implements RowAdapter.Listener {
         } catch (PackageManager.NameNotFoundException ignored) {
         }
         return act.getString(R.string.cat_video);
+    }
+
+    /** The line under an app's name: what's popular on it this week (WeeklyArt), or a line about it. */
+    private String heroLine(String pkg) {
+        String week = WeeklyArt.title(act, pkg);
+        return week != null ? act.getString(R.string.hero_this_week, week) : tagline(pkg);
     }
 
     /** One plain line about well-known apps, like Rivulet's tagline under the title. */

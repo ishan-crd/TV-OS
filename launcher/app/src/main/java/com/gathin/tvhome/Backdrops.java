@@ -134,6 +134,19 @@ final class Backdrops {
     private Bitmap compose(String pkg, Drawable art) {
         Bitmap custom = loadCustom(pkg);
         if (custom != null) return custom;
+        // Streaming apps: this week's popular title on the service (WeeklyArt), as sharp as show art.
+        java.io.File weekly = WeeklyArt.image(ctx, pkg);
+        if (weekly != null) {
+            Bitmap src = Posters.get(ctx).decode(android.net.Uri.fromFile(weekly).toString(), PW, PH);
+            if (src != null) {
+                Bitmap out = Bitmap.createBitmap(PW, PH, Bitmap.Config.ARGB_8888);
+                Canvas c = new Canvas(out);
+                c.drawColor(Color.BLACK);
+                drawCover(new android.graphics.drawable.BitmapDrawable(ctx.getResources(), src), c, PW, PH);
+                src.recycle();
+                return out;
+            }
+        }
 
         Bitmap out = Bitmap.createBitmap(W, H, Bitmap.Config.ARGB_8888);
         Canvas c = new Canvas(out);

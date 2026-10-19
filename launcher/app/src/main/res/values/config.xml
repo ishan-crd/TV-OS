@@ -50,6 +50,16 @@
          https://github.com/prat3ik/iMirror, installed separately). The tile is hidden when it isn't installed. -->
     <string name="mirroring_app" translatable="false">dev.imirror.receiver</string>
 
+    <!-- Hero home: each of these apps gets the artwork of what's popular on that service this week, as
+         package=TMDB watch-provider id (India: Netflix 8, Prime Video 119, JioHotstar 2336). Needs tmdb.key
+         in local.properties; without it, or for other apps, the app's colour glow is used. -->
+    <string-array name="weekly_art">
+        <item>com.netflix.ninja=8</item>
+        <item>com.amazon.amazonvideo.livingroom=119</item>
+        <item>in.startv.hotstar=2336</item>
+    </string-array>
+    <string name="weekly_art_region" translatable="false">IN</string>
+
     <!-- Hero home at night: the artwork is darkened by this much between these hours (24 h clock).
          Same start and end hour = off. -->
     <integer name="night_start_hour">22</integer>
