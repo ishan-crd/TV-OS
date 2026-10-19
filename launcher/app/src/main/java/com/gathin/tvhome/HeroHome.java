@@ -36,7 +36,7 @@ final class HeroHome implements RowAdapter.Listener {
     private static final long AUTO_ADVANCE_MS = 9000;
     private static final long ROW_BACKDROP_DELAY_MS = 220;
     /** How far the page slides up when the rows take focus. */
-    private static final float ROWS_SHIFT_DP = 386;
+    private static final float ROWS_SHIFT_DP = 456 - 232;   // first row title from 456 dp to FOCUSED_ROW_Y_DP
 
     // Static so they survive the activity being recreated while another app is open.
     private static String lastSlidePkg;
@@ -540,28 +540,26 @@ final class HeroHome implements RowAdapter.Listener {
         return -1;
     }
 
+    /** Where the focused row's title sits on screen, JioHotstar style: the lower half, art above it. */
+    private static final float FOCUSED_ROW_Y_DP = 232;
+
     /**
-     * Slides the page so the focused row is on screen: the first two visible rows fit under the top bar,
-     * a later row moves the page up by the distance from the second visible row to it.
+     * Slides the page so the focused row sits in the lower half of the screen, and fades out the rows
+     * above it, leaving the top of the screen to the focused title's artwork (as JioHotstar does).
      */
     private void scrollPageTo(int row, boolean animate) {
-        int first = nextRow(-1, 1);
-        int second = first < 0 ? -1 : nextRow(first, 1);
-        float extra = 0f;
-        if (second >= 0 && row != first && row != second) {
-            extra = rowTitles[row].getTop() - rowTitles[second].getTop();
-        }
-        float y = -ROWS_SHIFT_DP * density - extra;
-        // Rows that slide up under the top bar fade out instead of peeking out behind the pills.
+        View rowsBlock = (View) rows[row].getParent();
+        float titleTop = rowsBlock.getTop() + rowTitles[row].getTop();
+        float y = FOCUSED_ROW_Y_DP * density - titleTop;
         for (int r = 0; r < ROWS; r++) {
-            float alpha = extra > 0 && r < second ? 0f : 1f;
+            float alpha = r < row ? 0f : 1f;
             if (rows[r].getAlpha() != alpha) {
-                rows[r].animate().alpha(alpha).setDuration(animate ? 200 : 0).start();
-                rowTitles[r].animate().alpha(alpha).setDuration(animate ? 200 : 0).start();
+                rows[r].animate().alpha(alpha).setDuration(animate ? 260 : 0).start();
+                rowTitles[r].animate().alpha(alpha).setDuration(animate ? 260 : 0).start();
             }
         }
         if (Math.abs(page.getTranslationY() - y) < 1f) return;
-        page.animate().translationY(y).setDuration(animate ? 320 : 0)
+        page.animate().translationY(y).setDuration(animate ? 360 : 0)
                 .setInterpolator(new DecelerateInterpolator(2f)).start();
     }
 
@@ -640,7 +638,8 @@ final class HeroHome implements RowAdapter.Listener {
 
     /** The dim layer over the artwork: the night setting, or half while the rows are up, whichever is darker. */
     private void applyDim(long duration) {
-        float target = Math.max(nightDim, inRows ? 0.5f : 0f);
+        // Light while the rows are up, so the focused title's artwork shows (the bottom is dark already).
+        float target = Math.max(nightDim, inRows ? 0.15f : 0f);
         dim.animate().cancel();
         if (target > 0f) {
             dim.setVisibility(View.VISIBLE);
