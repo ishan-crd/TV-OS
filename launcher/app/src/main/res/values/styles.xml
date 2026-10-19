@@ -26,6 +26,16 @@
     </style>
     <style name="TopButton" parent="TopButtonBase" />
 
+    <!-- Quick settings panel: the app underneath stays visible, slightly dimmed. -->
+    <style name="Theme.QuickPanel" parent="android:Theme.Material.NoActionBar.Fullscreen">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:colorBackgroundCacheHint">@null</item>
+        <item name="android:backgroundDimEnabled">true</item>
+        <item name="android:backgroundDimAmount">0.35</item>
+        <item name="android:windowAnimationStyle">@null</item>
+    </style>
+
     <!-- Rivulet-style home (activity_hero.xml). -->
     <style name="HeroTopButton">
         <item name="android:layout_width">wrap_content</item>

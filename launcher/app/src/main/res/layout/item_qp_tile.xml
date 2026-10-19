@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="0dp"
+    android:layout_height="52dp"
+    android:layout_weight="1"
+    android:paddingStart="12dp"
+    android:paddingEnd="8dp"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:background="@drawable/qp_tile_bg"
+    android:focusable="true"
+    android:clickable="true">
+
+    <ImageView
+        android:id="@+id/qpIcon"
+        android:layout_width="17dp"
+        android:layout_height="17dp"
+        android:tint="@color/qp_fg"
+        android:duplicateParentState="true"
+        android:contentDescription="@null" />
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:layout_marginStart="8dp"
+        android:duplicateParentState="true"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/qpLabel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:singleLine="true"
+            android:ellipsize="end"
+            android:duplicateParentState="true"
+            android:textColor="@color/qp_fg"
+            android:textSize="12.5sp"
+            android:fontFamily="@font/ui"
+            android:fontVariationSettings="'wght' 500, 'opsz' 17" />
+
+        <TextView
+            android:id="@+id/qpSub"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:singleLine="true"
+            android:ellipsize="end"
+            android:duplicateParentState="true"
+            android:textColor="@color/qp_fg"
+            android:alpha="0.75"
+            android:textSize="10sp"
+            android:fontFamily="@font/ui"
+            android:fontVariationSettings="'wght' 400, 'opsz' 17"
+            android:visibility="gone" />
+    </LinearLayout>
+</LinearLayout>

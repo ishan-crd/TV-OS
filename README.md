@@ -28,6 +28,11 @@ install tools and debloat approach it builds on. The home screen design is inspi
   - **All Apps**.
 - **Long-press any card** to edit from the sofa: add to or remove from Your Apps, move left or right, add
   to or remove from the featured carousel, resume a show, or open the app's info.
+- **Quick settings panel** on the remote's Settings button, laid out like Google TV's: date and time,
+  **All settings**, and tiles for Screensaver, Inputs, Picture, Sound, Wi-Fi (with the network name),
+  Bluetooth (Remotes & Accessories), Display mode and Accessibility. It slides in from the right over
+  whatever is playing, and nothing of it runs while it's closed. Bluetooth's page is one Settings won't
+  open for other apps, so the remote-key service selects it inside Settings (it only watches Settings).
 - **Night mode**: from 22:00 to 06:00 the artwork is dimmed (`night_*` in config.xml).
 - **Clock screensaver** that drifts every 30 seconds so nothing burns in.
 - **Top bar**: a Home pill, the clock and a glass **Wi-Fi** pill showing the network name. Inputs and
@@ -101,13 +106,13 @@ With the stock launcher disabled, some remote buttons lose their handler, and on
 handler crashes. `InputKeyService` (an accessibility service, enabled by `INPUT_KEY_SERVICE=1`) takes those
 keys first. In `remote_app_keys`, each item is `KEYCODE_NAME=target` or `KEYCODE_NAME:scancode=target`
 (when one key code serves several buttons); the target is a package to open, `@inputs`, `@settings`,
-`@home`, or empty to swallow the key.
+`@panel` (quick settings panel), `@home`, or empty to swallow the key.
 
 To see what a button sends: `tools/tv.py 'setprop log.tag.InputKeyService DEBUG'`, press it, then
 `tools/tv.py 'logcat -d | grep InputKeyService'`.
 
 **Philips Smart 4K TV (Skyworth, Google TV 14)**, which the defaults are set up for: Input sends
-`ENDCALL` scan 383, the programmable button `ENDCALL` scan 176, Settings sends `NOTIFICATION`.
+`ENDCALL` scan 383, the programmable button `ENDCALL` scan 176, Settings sends `NOTIFICATION` (opens the quick panel).
 Skyworth's global-key service crashes on `ENDCALL`/`MACRO_2-4` while the stock launcher is disabled, and
 five crashes in a row make Android's RescueParty reset settings, so those keys must stay mapped. See
 [`devices/philips-smart-4k-google-tv/debloat.txt`](devices/philips-smart-4k-google-tv/debloat.txt).

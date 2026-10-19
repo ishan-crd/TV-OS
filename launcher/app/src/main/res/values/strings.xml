@@ -48,6 +48,13 @@
     <string name="cat_maps">Maps</string>
     <string name="cat_productivity">Productivity</string>
     <string name="cat_tv">TV</string>
+    <string name="qp_all_settings">All settings</string>
+    <string name="qp_screensaver">Screensaver</string>
+    <string name="qp_picture">Picture</string>
+    <string name="qp_sound">Sound</string>
+    <string name="qp_bluetooth">Bluetooth</string>
+    <string name="qp_display_mode">Display mode</string>
+    <string name="qp_accessibility">Accessibility</string>
     <string name="menu_resume">Resume %1$s</string>
     <string name="menu_open">Open %1$s</string>
     <string name="menu_add_your_apps">Add to Your Apps</string>

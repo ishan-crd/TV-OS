@@ -56,6 +56,26 @@
             </intent-filter>
         </activity>
 
+        <!-- Quick settings panel (the remote's Settings button) over whatever is on screen. -->
+        <activity
+            android:name=".QuickPanelActivity"
+            android:exported="false"
+            android:theme="@style/Theme.QuickPanel"
+            android:launchMode="singleTask"
+            android:taskAffinity="com.gathin.tvhome.panel"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:configChanges="orientation|screenSize|keyboard|keyboardHidden|uiMode" />
+
+        <!-- "Screensaver" in the quick panel: the clock screensaver right now. -->
+        <activity
+            android:name=".ClockActivity"
+            android:exported="false"
+            android:theme="@style/Theme.TvHome"
+            android:taskAffinity="com.gathin.tvhome.clock"
+            android:excludeFromRecents="true"
+            android:noHistory="true" />
+
         <activity
             android:name=".HomeSettingsActivity"
             android:exported="false"

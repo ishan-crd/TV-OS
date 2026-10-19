@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Quick settings panel (the remote's Settings button), laid out like Google TV's: date and time with an
+     All settings button, then a two-column grid of tiles. Plain views, built once, nothing running. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <LinearLayout
+        android:id="@+id/qpPanel"
+        android:layout_width="300dp"
+        android:layout_height="wrap_content"
+        android:layout_gravity="end"
+        android:layout_marginTop="16dp"
+        android:layout_marginEnd="16dp"
+        android:padding="14dp"
+        android:orientation="vertical"
+        android:background="@drawable/qp_panel_bg"
+        android:elevation="16dp">
+
+        <RelativeLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="4dp"
+            android:layout_marginBottom="14dp">
+
+            <TextClock
+                android:id="@+id/qpDate"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:format12Hour="EEE, MMM d"
+                android:format24Hour="EEE, MMM d"
+                android:textColor="#B3FFFFFF"
+                android:textSize="12sp"
+                android:fontFamily="@font/ui"
+                android:fontVariationSettings="'wght' 500, 'opsz' 17" />
+
+            <TextClock
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_below="@id/qpDate"
+                android:layout_marginTop="2dp"
+                android:format12Hour="h:mm a"
+                android:format24Hour="HH:mm"
+                android:textColor="#FFFFFFFF"
+                android:textSize="22sp"
+                android:fontFamily="@font/ui"
+                android:fontVariationSettings="'wght' 600, 'opsz' 28" />
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_alignParentEnd="true"
+                android:gravity="center_horizontal"
+                android:orientation="vertical">
+
+                <FrameLayout
+                    android:id="@+id/qpAllSettings"
+                    android:layout_width="30dp"
+                    android:layout_height="30dp"
+                    android:background="@drawable/qp_gear_bg"
+                    android:focusable="true"
+                    android:clickable="true"
+                    android:contentDescription="@string/qp_all_settings">
+
+                    <ImageView
+                        android:layout_width="17dp"
+                        android:layout_height="17dp"
+                        android:layout_gravity="center"
+                        android:src="@drawable/ic_settings"
+                        android:tint="@color/qp_fg"
+                        android:duplicateParentState="true"
+                        android:contentDescription="@null" />
+                </FrameLayout>
+
+                <TextView
+                    android:id="@+id/qpAllSettingsLabel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="3dp"
+                    android:text="@string/qp_all_settings"
+                    android:textColor="#E6FFFFFF"
+                    android:textSize="9.5sp"
+                    android:fontFamily="@font/ui"
+                    android:fontVariationSettings="'wght' 500, 'opsz' 17"
+                    android:visibility="invisible" />
+            </LinearLayout>
+        </RelativeLayout>
+
+        <LinearLayout
+            android:id="@+id/qpTiles"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical" />
+    </LinearLayout>
+</FrameLayout>

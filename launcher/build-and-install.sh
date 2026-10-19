@@ -48,7 +48,7 @@ printf '%s\n' \
   "appops set com.gathin.tvhome GET_USAGE_STATS allow; echo usage-access-granted" \
   "pm grant com.gathin.tvhome android.permission.READ_TV_LISTINGS 2>/dev/null; echo watch-next-granted" \
   "cmd package compile -m speed -f com.gathin.tvhome" \
-  "am start -W -n com.gathin.tvhome/.MainActivity | grep -E '^(Status|Error)'" \
+  "am start -W -a android.intent.action.MAIN -c android.intent.category.HOME -n com.gathin.tvhome/.MainActivity | grep -E '^(Status|Error)'" \
   "$DISABLE_STOCK" \
   "cmd package set-home-activity --user 0 com.gathin.tvhome/.MainActivity" \
   | "$PY" -I ../tools/tv.py --batch

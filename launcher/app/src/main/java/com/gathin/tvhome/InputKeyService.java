@@ -27,12 +27,20 @@ public class InputKeyService extends AccessibilityService {
     private static final String TAG = "InputKeyService";
     private static final String ACTION_VIEW_INPUTS = "com.android.tv.action.VIEW_INPUTS";
 
+    /** The running service, for the quick panel; null when it's off. */
+    private static InputKeyService instance;
+    /** A Settings entry to select once Settings is on screen (see openSettingsEntry), and until when to try. */
+    private String pendingEntry;
+    private long pendingUntil;
+    private int pendingScrolls;
+
     /** "keyCode" or "keyCode:scanCode" → target; an empty target swallows the key. */
     private final Map<String, String> appKeys = new HashMap<>();
 
     @Override
     protected void onServiceConnected() {
         super.onServiceConnected();
+        instance = this;
         appKeys.clear();
         for (String item : getResources().getStringArray(R.array.remote_app_keys)) {
             int eq = item.indexOf('=');
@@ -75,6 +83,8 @@ public class InputKeyService extends AccessibilityService {
                     + " -> " + (target.isEmpty() ? "(none)" : target));
             if (target.equals("@inputs")) {
                 open(new Intent(ACTION_VIEW_INPUTS));
+            } else if (target.equals("@panel")) {
+                open(new Intent(this, QuickPanelActivity.class));
             } else if (target.equals("@settings")) {
                 open(new Intent(android.provider.Settings.ACTION_SETTINGS));
             } else if (target.equals("@home")) {
@@ -95,8 +105,78 @@ public class InputKeyService extends AccessibilityService {
         }
     }
 
+    /**
+     * Opens Android TV Settings and selects the entry whose title starts with `title` (e.g. "Remotes"),
+     * for pages Settings won't open for other apps. Events are only delivered for the Settings package
+     * (input_key_service.xml), so this costs nothing elsewhere. False when the service isn't running.
+     */
+    static boolean openSettingsEntry(android.content.Context c, String title) {
+        InputKeyService s = instance;
+        if (s == null) return false;
+        s.pendingEntry = title.toLowerCase(java.util.Locale.ROOT);
+        s.pendingUntil = System.currentTimeMillis() + 5000;
+        s.pendingScrolls = 0;
+        s.open(new Intent(android.provider.Settings.ACTION_SETTINGS));
+        return true;
+    }
+
     @Override
     public void onAccessibilityEvent(AccessibilityEvent event) {
+        if (pendingEntry == null) return;
+        if (System.currentTimeMillis() > pendingUntil) {
+            pendingEntry = null;
+            return;
+        }
+        android.view.accessibility.AccessibilityNodeInfo root = getRootInActiveWindow();
+        if (root == null) return;
+        android.view.accessibility.AccessibilityNodeInfo hit = find(root, pendingEntry);
+        if (hit == null) {
+            // Not laid out yet: the entry is further down the list. Scroll it a page at a time.
+            android.view.accessibility.AccessibilityNodeInfo list = scrollable(root);
+            if (list != null && pendingScrolls < 6) {
+                pendingScrolls++;
+                list.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_SCROLL_FORWARD);
+            }
+            return;
+        }
+        android.view.accessibility.AccessibilityNodeInfo n = hit;
+        while (n != null && !n.isClickable()) n = n.getParent();
+        if (n != null) {
+            n.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_FOCUS);
+            n.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK);
+            pendingEntry = null;
+        }
+    }
+
+    private static android.view.accessibility.AccessibilityNodeInfo scrollable(
+            android.view.accessibility.AccessibilityNodeInfo node) {
+        if (node.isScrollable()) return node;
+        for (int i = 0; i < node.getChildCount(); i++) {
+            android.view.accessibility.AccessibilityNodeInfo child = node.getChild(i);
+            if (child == null) continue;
+            android.view.accessibility.AccessibilityNodeInfo hit = scrollable(child);
+            if (hit != null) return hit;
+        }
+        return null;
+    }
+
+    private static android.view.accessibility.AccessibilityNodeInfo find(
+            android.view.accessibility.AccessibilityNodeInfo node, String prefix) {
+        CharSequence t = node.getText();
+        if (t != null && t.toString().toLowerCase(java.util.Locale.ROOT).startsWith(prefix)) return node;
+        for (int i = 0; i < node.getChildCount(); i++) {
+            android.view.accessibility.AccessibilityNodeInfo child = node.getChild(i);
+            if (child == null) continue;
+            android.view.accessibility.AccessibilityNodeInfo hit = find(child, prefix);
+            if (hit != null) return hit;
+        }
+        return null;
+    }
+
+    @Override
+    public void onDestroy() {
+        if (instance == this) instance = null;
+        super.onDestroy();
     }
 
     @Override
