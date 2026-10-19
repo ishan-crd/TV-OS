@@ -136,9 +136,7 @@ final class HeroHome implements RowAdapter.Listener {
         }
         // Smaller icons in the top-right pills than the classic layout's.
         int icon = Math.round(15 * density);
-        sizeIcon(act.findViewById(R.id.btnInputs), R.drawable.ic_input, icon);
         sizeIcon(act.findViewById(R.id.btnWifi), R.drawable.ic_wifi, icon);
-        sizeIcon(act.findViewById(R.id.btnSettings), R.drawable.ic_settings, icon);
     }
 
     private void sizeIcon(TextView v, int res, int px) {
@@ -320,9 +318,7 @@ final class HeroHome implements RowAdapter.Listener {
                 focusCard(0, 0);
                 return true;
             case KeyEvent.KEYCODE_DPAD_UP:
-                View top = act.findViewById(R.id.btnInputs);
-                if (top.getVisibility() != View.VISIBLE) top = act.findViewById(R.id.btnWifi);
-                top.requestFocus();
+                act.findViewById(R.id.btnWifi).requestFocus();
                 return true;
             case KeyEvent.KEYCODE_DPAD_LEFT:
                 if (v == btnOpen) {

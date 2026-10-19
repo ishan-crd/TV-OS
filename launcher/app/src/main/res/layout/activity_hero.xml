@@ -303,7 +303,7 @@
         </LinearLayout>
     </LinearLayout>
 
-    <!-- Top right: clock, then Inputs, network and Settings as glass pills. -->
+    <!-- Top right: the clock and the network pill. (Inputs and Settings are on the remote's own buttons.) -->
     <LinearLayout
         android:id="@+id/topButtons"
         android:layout_width="wrap_content"
@@ -330,24 +330,12 @@
             android:shadowRadius="6" />
 
         <TextView
-            android:id="@+id/btnInputs"
-            style="@style/HeroTopButton"
-            android:text="@string/inputs"
-            android:nextFocusDown="@+id/btnOpen" />
-
-        <TextView
             android:id="@+id/btnWifi"
             style="@style/HeroTopButton"
             android:maxWidth="160dp"
             android:singleLine="true"
             android:ellipsize="end"
             android:text="@string/wifi"
-            android:nextFocusDown="@+id/btnOpen" />
-
-        <TextView
-            android:id="@+id/btnSettings"
-            style="@style/HeroTopButton"
-            android:text="@string/settings"
             android:nextFocusDown="@+id/btnOpen" />
     </LinearLayout>
 </FrameLayout>

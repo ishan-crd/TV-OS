@@ -254,15 +254,16 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
 
     /** Inputs, network and Settings pills, shared by both layouts. */
     private void setUpTopButtons() {
+        // Either layout may leave a pill out (the hero home has no Inputs or Settings pill).
         btnInputs = findViewById(R.id.btnInputs);
         View btnSettings = findViewById(R.id.btnSettings);
-        btnInputs.setOnClickListener(v -> showInputs());
+        if (btnInputs != null) btnInputs.setOnClickListener(v -> showInputs());
         btnWifi.setOnClickListener(v -> openNetworkPill());
         btnWifi.setOnLongClickListener(v -> {
             open(new Intent(Settings.ACTION_WIFI_SETTINGS));
             return true;
         });
-        btnSettings.setOnClickListener(v -> open(new Intent(Settings.ACTION_SETTINGS)));
+        if (btnSettings != null) btnSettings.setOnClickListener(v -> open(new Intent(Settings.ACTION_SETTINGS)));
 
         // Keep focus on the top bar at its ends and at the top: Android's focus finder would otherwise
         // jump to a tile far below when there is nothing in that direction.
@@ -272,13 +273,14 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
                 // The left end is Inputs, or Wi-Fi on a box without inputs.
                 return v.getId() == R.id.btnInputs
-                        || (v.getId() == R.id.btnWifi && btnInputs.getVisibility() != View.VISIBLE);
+                        || (v.getId() == R.id.btnWifi && (btnInputs == null || btnInputs.getVisibility() != View.VISIBLE));
             }
-            return keyCode == KeyEvent.KEYCODE_DPAD_RIGHT && v.getId() == R.id.btnSettings;
+            return keyCode == KeyEvent.KEYCODE_DPAD_RIGHT
+                    && (v.getId() == R.id.btnSettings || (v.getId() == R.id.btnWifi && btnSettings == null));
         };
-        btnInputs.setOnKeyListener(pillKeys);
+        if (btnInputs != null) btnInputs.setOnKeyListener(pillKeys);
         btnWifi.setOnKeyListener(pillKeys);
-        btnSettings.setOnKeyListener(pillKeys);
+        if (btnSettings != null) btnSettings.setOnKeyListener(pillKeys);
     }
 
     @Override
@@ -565,6 +567,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
 
     /** Hides the Inputs pill when it would have nothing to list: streaming boxes have no HDMI-in, AV or tuner. */
     private void updateInputsButton() {
+        if (btnInputs == null) return;
         boolean any = !liveTvPkg.isEmpty() && getPackageManager().getLeanbackLaunchIntentForPackage(liveTvPkg) != null;
         TvInputManager tim = (TvInputManager) getSystemService(TV_INPUT_SERVICE);
         if (!any && tim != null) {

@@ -30,8 +30,8 @@ install tools and debloat approach it builds on. The home screen design is inspi
   to or remove from the featured carousel, resume a show, or open the app's info.
 - **Night mode**: from 22:00 to 06:00 the artwork is dimmed (`night_*` in config.xml).
 - **Clock screensaver** that drifts every 30 seconds so nothing burns in.
-- **Top bar**: a Home pill, the clock, and glass pills for **Inputs** (HDMI, AV, Live TV), **Wi-Fi**
-  (shows the network name) and **Settings**.
+- **Top bar**: a Home pill, the clock and a glass **Wi-Fi** pill showing the network name. Inputs and
+  Settings are left to the remote's own buttons (see Remote buttons).
 - The backdrop follows the focused card; rows that scroll under the top bar fade out; Back returns
   to the carousel.
 
