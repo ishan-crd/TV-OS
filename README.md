@@ -125,8 +125,9 @@ tools/venv/bin/python -I tools/b64push.py my.jpg /sdcard/Android/data/com.gathin
 ```
 
 **Photo screensaver**: put pictures (JPEG, PNG or WebP) in the launcher's screensaver folder and the
-screensaver plays them, shuffled, with a crossfade, a slow zoom and a small clock in a bottom corner. Wide
-photos fill the screen; tall and square ones are shown whole over a blurred copy. They stay on the TV:
+screensaver plays them, shuffled, with a crossfade, a slow zoom and a small clock in the bottom left.
+Photos are zoomed to fill the screen; set `screensaver_photo_fill` to false to show tall and square ones
+whole over a blurred copy instead. They stay on the TV:
 nothing is uploaded, and an empty folder brings the clock back. Each one shows for
 `screensaver_photo_seconds` (12).
 

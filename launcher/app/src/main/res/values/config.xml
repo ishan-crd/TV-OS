@@ -70,6 +70,9 @@
     <!-- Photo screensaver: pictures put in /sdcard/Android/data/com.gathin.tvhome/files/screensaver are shown
          instead of the clock, each for this many seconds. An empty folder keeps the clock screensaver. -->
     <integer name="screensaver_photo_seconds">12</integer>
+    <!-- true: every photo zoomed to fill the screen (cropping tall ones); false: tall and square photos are
+         shown whole over a blurred copy. -->
+    <bool name="screensaver_photo_fill">true</bool>
 
     <!-- Apps never shown as tiles (e.g. the Live TV app, which the Inputs menu already covers). -->
     <string-array name="hidden_apps">

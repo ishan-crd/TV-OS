@@ -26,8 +26,9 @@ import java.util.concurrent.Executors;
 
 /**
  * Photo screensaver: the pictures in the launcher's files/screensaver folder on the TV, shuffled, one at a
- * time with a crossfade and a slow zoom. Wide photos fill the screen; tall and square ones are shown whole
- * over a blurred copy of themselves. Each one is decoded at screen size in the background, and only the
+ * time with a crossfade and a slow zoom. Photos are zoomed to fill the screen (config.xml
+ * screensaver_photo_fill), or with that off, wide ones fill and tall or square ones are shown whole over
+ * a blurred copy of themselves. Each one is decoded at screen size in the background, and only the
  * two on screen during a crossfade are kept in memory.
  */
 final class PhotoShow {
@@ -46,6 +47,7 @@ final class PhotoShow {
     private final ImageView[] views;
     private final List<File> files;
     private final long showMs;
+    private final boolean fill;
     private int next, front;
     private boolean running;
 
@@ -71,11 +73,13 @@ final class PhotoShow {
             }
         }
         if (pics.isEmpty()) return null;
-        return new PhotoShow(root, pics, c.getResources().getInteger(R.integer.screensaver_photo_seconds) * 1000L);
+        return new PhotoShow(root, pics, c.getResources().getInteger(R.integer.screensaver_photo_seconds) * 1000L,
+                c.getResources().getBoolean(R.bool.screensaver_photo_fill));
     }
 
-    private PhotoShow(View root, List<File> files, long showMs) {
+    private PhotoShow(View root, List<File> files, long showMs, boolean fill) {
         this.files = files;
+        this.fill = fill;
         this.showMs = Math.max(4000, showMs);
         views = new ImageView[]{root.findViewById(R.id.dreamPhotoA), root.findViewById(R.id.dreamPhotoB)};
         for (ImageView v : views) {
@@ -114,7 +118,7 @@ final class PhotoShow {
         if (next == 0) Collections.shuffle(files, random);
         try {
             io.execute(() -> {
-                Bitmap b = compose(f, w, h);
+                Bitmap b = compose(f, w, h, fill);
                 handler.post(() -> {
                     if (!running) return;
                     if (b != null) crossfade(b);
@@ -132,7 +136,9 @@ final class PhotoShow {
         ImageView in = views[front];
         in.animate().cancel();
         in.setImageBitmap(b);
-        in.bringToFront();
+        // The incoming photo goes over the outgoing one; the clock and its shade sit higher still (Z 2).
+        in.setTranslationZ(1f);
+        out.setTranslationZ(0f);
         // A slow zoom and drift across the photo's whole time on screen.
         float zoom = 1.08f;
         in.setScaleX(1f);
@@ -156,7 +162,7 @@ final class PhotoShow {
     }
 
     /** Blocking: the photo laid out on a screen-sized picture, upright, or null if it can't be read. */
-    private static Bitmap compose(File f, int w, int h) {
+    private static Bitmap compose(File f, int w, int h, boolean fill) {
         try {
             Bitmap photo = decode(f, w, h);
             if (photo == null) return null;
@@ -164,7 +170,7 @@ final class PhotoShow {
             Canvas c = new Canvas(out);
             Paint p = new Paint(Paint.FILTER_BITMAP_FLAG | Paint.ANTI_ALIAS_FLAG);
             float pw = photo.getWidth(), ph = photo.getHeight();
-            if (pw / ph >= FILL_ASPECT) {
+            if (fill || pw / ph >= FILL_ASPECT) {
                 // Fill: crop the sides or a sliver of the bottom, keeping faces (usually high in the frame).
                 float s = Math.max(w / pw, h / ph);
                 float left = (w - pw * s) / 2f, top = (h - ph * s) * 0.35f;
