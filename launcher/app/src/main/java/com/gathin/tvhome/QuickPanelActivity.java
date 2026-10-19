@@ -41,7 +41,7 @@ public class QuickPanelActivity extends Activity {
 
         LinearLayout tiles = findViewById(R.id.qpTiles);
         LinearLayout row = null;
-        // Screen mirroring: a separate receiver app (config.xml mirroring_app), shown only when installed.
+        // AirPlay: a separate receiver app (config.xml mirroring_app). Without it, the tile explains where to get it.
         String mirrorPkg = getString(R.string.mirroring_app).trim();
         Intent mirror = mirrorPkg.isEmpty() ? null : getPackageManager().getLeanbackLaunchIntentForPackage(mirrorPkg);
         if (mirror == null && !mirrorPkg.isEmpty()) mirror = getPackageManager().getLaunchIntentForPackage(mirrorPkg);
@@ -87,6 +87,9 @@ public class QuickPanelActivity extends Activity {
             // off without opening the app; otherwise it opens the app.
             Action mirrorAction = AirPlay.controllable(this) ? (Action) this::toggleAirPlay : () -> go(mirrorIntent);
             all.add(all.size() - 1, new Object[]{R.drawable.ic_qp_mirror, R.string.qp_mirroring, "", mirrorAction});
+        } else if (!mirrorPkg.isEmpty()) {
+            all.add(all.size() - 1, new Object[]{R.drawable.ic_qp_mirror, R.string.qp_mirroring,
+                    getString(R.string.airplay_get), (Action) this::showAirPlayInfo});
         }
         Object[][] items = all.toArray(new Object[0][]);
         int gap = Math.round(8 * getResources().getDisplayMetrics().density);
@@ -109,7 +112,8 @@ public class QuickPanelActivity extends Activity {
             }
             final Action action = (Action) items[i][3];
             tile.setOnClickListener(v -> action.run());
-            if ((int) items[i][1] == R.string.qp_mirroring) {
+            if ((int) items[i][1] == R.string.qp_mirroring) airPlayTile = tile;
+            if ((int) items[i][1] == R.string.qp_mirroring && mirrorIntent != null) {
                 airPlaySub = tile.findViewById(R.id.qpSub);
                 // Long press: the receiver's own settings (name, PIN).
                 tile.setOnLongClickListener(v -> {
@@ -132,6 +136,27 @@ public class QuickPanelActivity extends Activity {
     }
 
     private TextView airPlaySub;
+    private View airPlayTile;
+
+    /** Swaps the tiles for "get the iMirror app" (link and QR code); Back swaps them back. */
+    private void showAirPlayInfo() {
+        findViewById(R.id.qpTiles).setVisibility(View.GONE);
+        View info = findViewById(R.id.qpAirPlayInfo);
+        info.setVisibility(View.VISIBLE);
+        info.requestFocus();
+    }
+
+    @Override
+    public void onBackPressed() {
+        View info = findViewById(R.id.qpAirPlayInfo);
+        if (info.getVisibility() == View.VISIBLE) {
+            info.setVisibility(View.GONE);
+            findViewById(R.id.qpTiles).setVisibility(View.VISIBLE);
+            if (airPlayTile != null) airPlayTile.requestFocus();
+            return;
+        }
+        super.onBackPressed();
+    }
 
     private void toggleAirPlay() {
         if (airPlaySub == null) return;

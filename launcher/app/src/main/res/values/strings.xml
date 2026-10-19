@@ -51,6 +51,11 @@
     <string name="qp_all_settings">All settings</string>
     <string name="qp_running_apps">Running apps</string>
     <string name="qp_mirroring">AirPlay</string>
+    <string name="airplay_get">Get the app</string>
+    <string name="airplay_get_title">AirPlay needs the iMirror app</string>
+    <string name="airplay_get_body">Download the free iMirror app to mirror your iPhone, iPad or Mac to this TV. Once it\'s installed, this tile turns AirPlay on and off.</string>
+    <string name="airplay_get_scan">Scan with your phone, or open\ngithub.com/prat3ik/iMirror</string>
+    <string name="airplay_get_url" translatable="false">https://github.com/prat3ik/iMirror</string>
     <string name="airplay_on">On · %1$s</string>
     <string name="airplay_off">Off</string>
     <string name="airplay_starting">Turning on…</string>

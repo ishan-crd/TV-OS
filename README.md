@@ -43,7 +43,8 @@ install tools and debloat approach it builds on. The home screen design is inspi
   session starts; Back ends the session. Install it with `tools/b64push.py` + `pm install`, then
   `appops set dev.imirror.receiver SYSTEM_ALERT_WINDOW allow` and
   `dumpsys deviceidle whitelist +dev.imirror.receiver` so it may start in the background. Without the
-  fork, the tile just opens the app. It's hidden from the app rows (`hidden_apps`).
+  fork, the tile just opens the app. It's hidden from the app rows (`hidden_apps`). Without any receiver
+  installed, the tile says "Get the app" and shows where to download it, with a QR code.
 - **Running apps** (last tile of the quick panel): the apps you opened since the TV started, memory in
   use, ✕ per app and **Clear all**. Closing is a real force stop, which Android only allows the system,
   so the remote-key service presses Force stop → OK on each app's Settings page (about a second per app)
@@ -133,6 +134,19 @@ To see what a button sends: `tools/tv.py 'setprop log.tag.InputKeyService DEBUG'
 Skyworth's global-key service crashes on `ENDCALL`/`MACRO_2-4` while the stock launcher is disabled, and
 five crashes in a row make Android's RescueParty reset settings, so those keys must stay mapped. See
 [`devices/philips-smart-4k-google-tv/debloat.txt`](devices/philips-smart-4k-google-tv/debloat.txt).
+
+## AirPlay (iMirror)
+
+AirPlay comes from a separate, free app, **iMirror** by prat3ik:
+
+- Source: https://github.com/prat3ik/iMirror (GPL-3.0)
+- Ready-made APKs: https://github.com/prat3ik/iMirror/tree/main/apk (`armeabi-v7a` for most TVs,
+  `arm64-v8a` for newer 64-bit ones, `universal` when unsure; `getprop ro.product.cpu.abilist` tells)
+
+Install it with `tools/venv/bin/python -I tools/b64push.py iMirror.apk /data/local/tmp/im.apk` and
+`tools/tv.py 'pm install -r /data/local/tmp/im.apk'`. The quick panel's AirPlay tile then opens it. For the
+on/off toggle without the app's screens, the receiver needs the small control addition described above
+(signed with the same key as the launcher); the stock app works too, it just opens its own screen.
 
 ## Licence
 
