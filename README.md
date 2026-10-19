@@ -35,6 +35,12 @@ install tools and debloat approach it builds on. The home screen design is inspi
   Accessories directly, as Google TV's panel does: Settings only shows that page to holders of
   `WRITE_SECURE_SETTINGS`, which the install script grants over adb (without it, the remote-key service
   selects the entry inside Settings). Pages open in a fresh task, so one Back returns home.
+- **Mirroring** tile: opens an AirPlay receiver so an iPhone, iPad or Mac can mirror to the TV. It's a
+  separate app, [iMirror](https://github.com/prat3ik/iMirror) (GPL-3.0, kept out of this MIT codebase),
+  installed alongside; the tile only appears when it is (`mirroring_app` in config.xml). Build it from
+  source for your TV's ABI (`getprop ro.product.cpu.abilist`) and install it with `tools/b64push.py` +
+  `pm install`. It uses no memory until opened (start on boot is off by default); STOP in iMirror or
+  Clear all in Running apps ends it.
 - **Running apps** (last tile of the quick panel): the apps you opened since the TV started, memory in
   use, ✕ per app and **Clear all**. Closing is a real force stop, which Android only allows the system,
   so the remote-key service presses Force stop → OK on each app's Settings page (about a second per app)

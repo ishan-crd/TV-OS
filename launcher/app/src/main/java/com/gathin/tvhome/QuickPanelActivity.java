@@ -41,7 +41,12 @@ public class QuickPanelActivity extends Activity {
 
         LinearLayout tiles = findViewById(R.id.qpTiles);
         LinearLayout row = null;
-        Object[][] items = {
+        // Screen mirroring: a separate receiver app (config.xml mirroring_app), shown only when installed.
+        String mirrorPkg = getString(R.string.mirroring_app).trim();
+        Intent mirror = mirrorPkg.isEmpty() ? null : getPackageManager().getLeanbackLaunchIntentForPackage(mirrorPkg);
+        if (mirror == null && !mirrorPkg.isEmpty()) mirror = getPackageManager().getLaunchIntentForPackage(mirrorPkg);
+        final Intent mirrorIntent = mirror;
+        java.util.List<Object[]> all = new java.util.ArrayList<>(java.util.Arrays.asList(new Object[][]{
                 {R.drawable.ic_qp_screensaver, R.string.qp_screensaver, null,
                         (Action) () -> go(new Intent(this, ClockActivity.class))},
                 {R.drawable.ic_input, R.string.inputs, null,
@@ -76,7 +81,12 @@ public class QuickPanelActivity extends Activity {
                         (Action) () -> go(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))},
                 {R.drawable.ic_qp_apps, R.string.qp_running_apps, null,
                         (Action) () -> go(new Intent(this, RunningAppsActivity.class))},
-        };
+        }));
+        if (mirrorIntent != null) {
+            all.add(all.size() - 1, new Object[]{R.drawable.ic_qp_mirror, R.string.qp_mirroring, null,
+                    (Action) () -> go(mirrorIntent)});
+        }
+        Object[][] items = all.toArray(new Object[0][]);
         int gap = Math.round(8 * getResources().getDisplayMetrics().density);
         for (int i = 0; i < items.length; i++) {
             if (i % 2 == 0) {
