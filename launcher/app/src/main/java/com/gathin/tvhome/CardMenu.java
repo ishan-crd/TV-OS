@@ -109,9 +109,9 @@ final class CardMenu {
     private static void place(Activity act, ViewGroup root, PopupWindow popup, View panel, LinearLayout rows,
                               View card, float density) {
         // Under the card, or above it when there isn't room below.
-        // As wide as the longest option needs, between 240 and 380 dp.
+        // As wide as the longest option needs, between 220 and 260 dp; longer titles end in "…".
         panel.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED);
-        int width = Math.max(Math.round(240 * density), Math.min(Math.round(380 * density), panel.getMeasuredWidth()));
+        int width = Math.max(Math.round(220 * density), Math.min(Math.round(260 * density), panel.getMeasuredWidth()));
         popup.setWidth(width);
         panel.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
                 View.MeasureSpec.UNSPECIFIED);
@@ -122,7 +122,9 @@ final class CardMenu {
         if (y + panel.getMeasuredHeight() > root.getHeight()) y = Math.max(gap, r.top - gap - panel.getMeasuredHeight());
         panel.setAlpha(0f);
         panel.setScaleY(0.94f);
-        popup.showAtLocation(root, Gravity.NO_GRAVITY, r.left, y);
+        // Kept on screen: shifted left when the card is near the right edge.
+        int x = Math.max(gap, Math.min(r.left, root.getWidth() - width - Math.round(40 * density)));
+        popup.showAtLocation(root, Gravity.NO_GRAVITY, x, y);
         panel.animate().alpha(1f).scaleY(1f).setDuration(180).setInterpolator(new DecelerateInterpolator(1.6f)).start();
         rows.getChildAt(0).requestFocus();
     }
@@ -132,6 +134,7 @@ final class CardMenu {
         ((ImageView) row.findViewById(R.id.icon)).setImageResource(icon);
         TextView t = row.findViewById(R.id.title);
         t.setText(title);
+        t.setEllipsize(android.text.TextUtils.TruncateAt.END);
         row.findViewById(R.id.status).setVisibility(View.GONE);
         row.findViewById(R.id.dot).setVisibility(View.GONE);
         row.setOnClickListener(v -> {
