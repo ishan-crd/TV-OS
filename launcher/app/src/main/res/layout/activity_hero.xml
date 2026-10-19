@@ -303,7 +303,7 @@
         </LinearLayout>
     </LinearLayout>
 
-    <!-- Top right: the clock and the network pill. (Inputs and Settings are on the remote's own buttons.) -->
+    <!-- Top right: Wi-Fi and Bluetooth icons, then the clock. (Inputs and Settings are on the remote.) -->
     <LinearLayout
         android:id="@+id/topButtons"
         android:layout_width="wrap_content"
@@ -314,11 +314,24 @@
         android:gravity="center_vertical"
         android:orientation="horizontal">
 
+        <TextView
+            android:id="@+id/btnWifi"
+            style="@style/HeroTopIcon"
+            android:contentDescription="@string/wifi"
+            android:nextFocusDown="@+id/btnOpen" />
+
+        <TextView
+            android:id="@+id/btnBluetooth"
+            style="@style/HeroTopIcon"
+            android:layout_marginStart="6dp"
+            android:contentDescription="@string/qp_bluetooth"
+            android:nextFocusDown="@+id/btnOpen" />
+
         <TextClock
             android:id="@+id/clock"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginEnd="6dp"
+            android:layout_marginStart="10dp"
             android:format12Hour="h:mm"
             android:format24Hour="HH:mm"
             android:includeFontPadding="false"
@@ -328,14 +341,5 @@
             android:fontVariationSettings="'wght' 600, 'opsz' 17"
             android:shadowColor="#66000000"
             android:shadowRadius="6" />
-
-        <TextView
-            android:id="@+id/btnWifi"
-            style="@style/HeroTopButton"
-            android:maxWidth="160dp"
-            android:singleLine="true"
-            android:ellipsize="end"
-            android:text="@string/wifi"
-            android:nextFocusDown="@+id/btnOpen" />
     </LinearLayout>
 </FrameLayout>

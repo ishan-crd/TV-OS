@@ -73,6 +73,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private TextView greeting;
     private View btnInputs;
     private TextView btnWifi;
+    /** The hero home's top bar shows Wi-Fi as an icon only. */
+    private boolean iconOnlyWifi;
     private TextView shamsiDate;
     private boolean shamsi;
     private String vpnApp;
@@ -151,6 +153,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         btnWifi = findViewById(R.id.btnWifi);
         vpnApp = getString(R.string.vpn_app).trim();
         if (heroMode) {
+            iconOnlyWifi = true;
             hero = new HeroHome(this);
         } else {
             setUpClassic();
@@ -264,6 +267,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             return true;
         });
         if (btnSettings != null) btnSettings.setOnClickListener(v -> open(new Intent(Settings.ACTION_SETTINGS)));
+        View btnBluetooth = findViewById(R.id.btnBluetooth);
+        if (btnBluetooth != null) btnBluetooth.setOnClickListener(v -> QuickPanelActivity.openBluetooth(this));
 
         // Keep focus on the top bar at its ends and at the top: Android's focus finder would otherwise
         // jump to a tile far below when there is nothing in that direction.
@@ -275,9 +280,12 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                 return v.getId() == R.id.btnInputs
                         || (v.getId() == R.id.btnWifi && (btnInputs == null || btnInputs.getVisibility() != View.VISIBLE));
             }
-            return keyCode == KeyEvent.KEYCODE_DPAD_RIGHT
-                    && (v.getId() == R.id.btnSettings || (v.getId() == R.id.btnWifi && btnSettings == null));
+            // The right end is Settings, Bluetooth, or Wi-Fi when there's neither.
+            return keyCode == KeyEvent.KEYCODE_DPAD_RIGHT && (v.getId() == R.id.btnSettings
+                    || v.getId() == R.id.btnBluetooth
+                    || (v.getId() == R.id.btnWifi && btnSettings == null && btnBluetooth == null));
         };
+        if (btnBluetooth != null) btnBluetooth.setOnKeyListener(pillKeys);
         if (btnInputs != null) btnInputs.setOnKeyListener(pillKeys);
         btnWifi.setOnKeyListener(pillKeys);
         if (btnSettings != null) btnSettings.setOnKeyListener(pillKeys);
@@ -545,6 +553,12 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                 }
             }
         } catch (Exception ignored) {
+        }
+        if (iconOnlyWifi) {
+            // Hero home: just the icon; the network name is read out, and shown in the quick panel.
+            btnWifi.setText(null);
+            btnWifi.setContentDescription(text);
+            return;
         }
         if (vpn) {
             // Network name, then a green lock-and-VPN capsule drawn in place of the word "VPN".

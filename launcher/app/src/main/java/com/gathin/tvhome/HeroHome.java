@@ -136,7 +136,9 @@ final class HeroHome implements RowAdapter.Listener {
         }
         // Smaller icons in the top-right pills than the classic layout's.
         int icon = Math.round(15 * density);
+        icon = Math.round(16 * density);
         sizeIcon(act.findViewById(R.id.btnWifi), R.drawable.ic_wifi, icon);
+        sizeIcon(act.findViewById(R.id.btnBluetooth), R.drawable.ic_qp_bluetooth, icon);
     }
 
     private void sizeIcon(TextView v, int res, int px) {

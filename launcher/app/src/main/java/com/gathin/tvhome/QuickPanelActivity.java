@@ -54,15 +54,8 @@ public class QuickPanelActivity extends Activity {
                         // WRITE_SECURE_SETTINGS (granted over adb at install); without it, the remote-key service
                         // selects the entry inside Settings instead.
                         (Action) () -> {
-                            if (checkSelfPermission("android.permission.WRITE_SECURE_SETTINGS")
-                                    == android.content.pm.PackageManager.PERMISSION_GRANTED) {
-                                go(new Intent("android.settings.SLICE_SETTINGS").putExtra("slice_uri",
-                                        "content://com.android.tv.settings.accessories.sliceprovider/general"));
-                            } else if (InputKeyService.openSettingsEntry(this, "Remotes")) {
-                                finish();
-                            } else {
-                                go(new Intent(Settings.ACTION_SETTINGS));
-                            }
+                            openBluetooth(this);
+                            finish();
                         }},
                 {R.drawable.ic_qp_picture, R.string.qp_picture, null,
                         (Action) () -> go(new Intent(Settings.ACTION_DISPLAY_SETTINGS))},
@@ -290,6 +283,29 @@ public class QuickPanelActivity extends Activity {
         String name = Settings.Global.getString(getContentResolver(), "device_name");
         airPlaySub.setText(on ? getString(R.string.airplay_on, name == null ? "" : name) : getString(R.string.airplay_off));
         airPlaySub.setVisibility(View.VISIBLE);
+    }
+
+    /**
+     * Opens Android TV's "Remotes & Accessories" page (Bluetooth on/off, pair, devices) directly, as Google
+     * TV's panel does. Settings only shows it to holders of WRITE_SECURE_SETTINGS (granted over adb at
+     * install); without it, the remote-key service selects the entry inside Settings instead.
+     */
+    static void openBluetooth(Context c) {
+        Intent i;
+        if (c.checkSelfPermission("android.permission.WRITE_SECURE_SETTINGS")
+                == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            i = new Intent("android.settings.SLICE_SETTINGS").putExtra("slice_uri",
+                    "content://com.android.tv.settings.accessories.sliceprovider/general");
+        } else if (InputKeyService.openSettingsEntry(c, "Remotes")) {
+            return;
+        } else {
+            i = new Intent(Settings.ACTION_SETTINGS);
+        }
+        try {
+            c.startActivity(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK));
+        } catch (Exception e) {
+            Toast.makeText(c, R.string.not_available, Toast.LENGTH_SHORT).show();
+        }
     }
 
     /** The Settings button again closes the panel (it arrives here because the panel is singleTask). */

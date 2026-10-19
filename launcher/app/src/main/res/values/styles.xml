@@ -55,6 +55,17 @@
         <item name="android:focusable">true</item>
         <item name="android:clickable">true</item>
     </style>
+    <!-- A bare icon in the hero's top bar; a white circle (and a dark icon) only when focused. -->
+    <style name="HeroTopIcon">
+        <item name="android:layout_width">30dp</item>
+        <item name="android:layout_height">30dp</item>
+        <item name="android:paddingStart">7dp</item>
+        <item name="android:gravity">center_vertical</item>
+        <item name="android:background">@drawable/hero_icon_bg</item>
+        <item name="android:drawableTint">@color/hero_btn_fg</item>
+        <item name="android:focusable">true</item>
+        <item name="android:clickable">true</item>
+    </style>
     <style name="HeroRowTitle">
         <item name="android:layout_width">wrap_content</item>
         <item name="android:layout_height">wrap_content</item>
