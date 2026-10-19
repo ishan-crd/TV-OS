@@ -47,7 +47,8 @@ public class QuickPanelActivity extends Activity {
         if (mirror == null && !mirrorPkg.isEmpty()) mirror = getPackageManager().getLaunchIntentForPackage(mirrorPkg);
         final Intent mirrorIntent = mirror;
         java.util.List<Object[]> all = new java.util.ArrayList<>(java.util.Arrays.asList(new Object[][]{
-                {R.drawable.ic_wifi, R.string.wifi, networkName(), (Action) this::showWifi},
+                {R.drawable.ic_wifi, R.string.wifi, networkName(), WIFI_LIST_IN_PANEL ? (Action) this::showWifi
+                        : (Action) () -> go(new Intent(Settings.ACTION_WIFI_SETTINGS))},
                 {R.drawable.ic_qp_bluetooth, R.string.qp_bluetooth, null,
                         // Android TV's own "Remotes & Accessories" page (Bluetooth on/off, pair, devices), opened
                         // directly as Google TV's panel does. Settings only shows it to holders of
@@ -129,6 +130,12 @@ public class QuickPanelActivity extends Activity {
     }
 
     private TextView airPlaySub;
+    /**
+     * Off for now: Wi-Fi opens the system Wi-Fi page, as the home's Wi-Fi icon does. Set to true for the
+     * network list inside the panel (showWifi below), like Google TV's.
+     */
+    private static final boolean WIFI_LIST_IN_PANEL = false;
+
     private View airPlayTile, wifiTile;
     private android.content.BroadcastReceiver scanReceiver;
 
