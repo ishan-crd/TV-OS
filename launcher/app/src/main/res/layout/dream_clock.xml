@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Screensaver (ClockDream): clock and date that drift around a black screen over an ambient glow. -->
+<!-- Screensaver (ClockDream): clock and date that drift around a black screen over an ambient glow;
+     with photos in files/screensaver, a slideshow (PhotoShow) with a small clock in a corner. -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
@@ -9,6 +10,31 @@
         android:id="@+id/dreamAmbient"
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
+
+    <ImageView
+        android:id="@+id/dreamPhotoA"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="centerCrop"
+        android:visibility="gone"
+        android:importantForAccessibility="no" />
+
+    <ImageView
+        android:id="@+id/dreamPhotoB"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="centerCrop"
+        android:visibility="gone"
+        android:importantForAccessibility="no" />
+
+    <!-- Photos only: shade along the bottom so the clock reads on bright pictures. -->
+    <View
+        android:id="@+id/dreamScrim"
+        android:layout_width="match_parent"
+        android:layout_height="260dp"
+        android:layout_gravity="bottom"
+        android:background="@drawable/dream_scrim"
+        android:visibility="gone" />
 
     <LinearLayout
         android:id="@+id/dreamContent"

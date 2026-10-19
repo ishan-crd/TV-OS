@@ -59,7 +59,8 @@ install tools and debloat approach it builds on. The home screen design is inspi
   so the remote-key service presses Force stop → OK on each app's Settings page (about a second per app)
   and returns you to the panel with the memory freed. The TV's own system apps aren't listed or stopped.
 - **Night mode**: from 22:00 to 06:00 the artwork is dimmed (`night_*` in config.xml).
-- **Clock screensaver** that drifts every 30 seconds so nothing burns in.
+- **Clock screensaver** that drifts every 30 seconds so nothing burns in, or a **photo screensaver** with
+  your own pictures (see Configure).
 - **Top bar**: a Home pill, the clock and a glass **Wi-Fi** pill showing the network name. Inputs and
   Settings are left to the remote's own buttons (see Remote buttons).
 - The backdrop follows the focused card; rows that scroll under the top bar fade out; Back returns
@@ -122,6 +123,20 @@ Everything per TV lives in [`launcher/app/src/main/res/values/config.xml`](launc
 tools/venv/bin/python -I tools/b64push.py my.jpg /sdcard/Android/data/com.gathin.tvhome/files/backdrops/com.netflix.ninja.jpg
 # logos: .../files/logos/<package>.png
 ```
+
+**Photo screensaver**: put pictures (JPEG, PNG or WebP) in the launcher's screensaver folder and the
+screensaver plays them, shuffled, with a crossfade, a slow zoom and a small clock in a bottom corner. Wide
+photos fill the screen; tall and square ones are shown whole over a blurred copy. They stay on the TV:
+nothing is uploaded, and an empty folder brings the clock back. Each one shows for
+`screensaver_photo_seconds` (12).
+
+```bash
+tools/venv/bin/python -I tools/tv.py 'mkdir -p /sdcard/Android/data/com.gathin.tvhome/files/screensaver'
+tools/venv/bin/python -I tools/b64push.py photo.jpg /sdcard/Android/data/com.gathin.tvhome/files/screensaver/photo.jpg
+```
+
+Phone photos can be 12 MP or more; scaling them to about 1920 px first (`sips -Z 1920 *.jpg` on a Mac)
+makes them quicker to push and to load. Photos are turned upright from their EXIF tag.
 
 **Font**: the repo ships [Inter](https://rsms.me/inter/). To use another font in your own builds, put it at
 `launcher/app/src/release/res/font/ui.ttf` (git-ignored); release builds pick it up over Inter.

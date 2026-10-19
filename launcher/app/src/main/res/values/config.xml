@@ -66,6 +66,10 @@
     <integer name="night_end_hour">6</integer>
     <integer name="night_dim_percent">40</integer>
 
+    <!-- Photo screensaver: pictures put in /sdcard/Android/data/com.gathin.tvhome/files/screensaver are shown
+         instead of the clock, each for this many seconds. An empty folder keeps the clock screensaver. -->
+    <integer name="screensaver_photo_seconds">12</integer>
+
     <!-- Apps never shown as tiles (e.g. the Live TV app, which the Inputs menu already covers). -->
     <string-array name="hidden_apps">
         <item>com.cltv.hybrid</item>

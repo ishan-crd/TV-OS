@@ -3,8 +3,8 @@ package com.gathin.tvhome;
 import android.service.dreams.DreamService;
 
 /**
- * Screensaver: the launcher's thin clock and date on black, over a slow ambient glow ({@link ClockScene}).
- * No network, no images: cheap enough for a 1 GB TV.
+ * Screensaver: the launcher's thin clock and date on black, over a slow ambient glow ({@link ClockScene}),
+ * or your own photos when there are some on the TV ({@link PhotoShow}). No network.
  */
 public class ClockDream extends DreamService {
 
