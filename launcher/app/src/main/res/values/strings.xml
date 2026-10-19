@@ -50,7 +50,11 @@
     <string name="cat_tv">TV</string>
     <string name="qp_all_settings">All settings</string>
     <string name="qp_running_apps">Running apps</string>
-    <string name="qp_mirroring">Mirroring</string>
+    <string name="qp_mirroring">AirPlay</string>
+    <string name="airplay_on">On · %1$s</string>
+    <string name="airplay_off">Off</string>
+    <string name="airplay_starting">Turning on…</string>
+    <string name="airplay_stopping">Turning off…</string>
     <string name="ra_title">Running apps</string>
     <string name="ra_memory">%1$s of %2$s in use</string>
     <string name="ra_freed">Freed %1$d MB</string>

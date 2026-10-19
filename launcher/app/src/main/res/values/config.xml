@@ -60,6 +60,8 @@
     <string-array name="hidden_apps">
         <item>com.cltv.hybrid</item>
         <item>com.mitv.gallery</item>
+        <!-- The AirPlay receiver: controlled from the quick panel, not opened as an app. -->
+        <item>dev.imirror.receiver</item>
     </string-array>
 
     <!-- The TV's Live TV / tuner app, offered at the end of the Inputs menu. Leave empty to omit. -->

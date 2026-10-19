@@ -83,8 +83,10 @@ public class QuickPanelActivity extends Activity {
                         (Action) () -> go(new Intent(this, RunningAppsActivity.class))},
         }));
         if (mirrorIntent != null) {
-            all.add(all.size() - 1, new Object[]{R.drawable.ic_qp_mirror, R.string.qp_mirroring, null,
-                    (Action) () -> go(mirrorIntent)});
+            // With the receiver's control permission (our iMirror build), the tile switches AirPlay on and
+            // off without opening the app; otherwise it opens the app.
+            Action mirrorAction = AirPlay.controllable(this) ? (Action) this::toggleAirPlay : () -> go(mirrorIntent);
+            all.add(all.size() - 1, new Object[]{R.drawable.ic_qp_mirror, R.string.qp_mirroring, "", mirrorAction});
         }
         Object[][] items = all.toArray(new Object[0][]);
         int gap = Math.round(8 * getResources().getDisplayMetrics().density);
@@ -107,6 +109,16 @@ public class QuickPanelActivity extends Activity {
             }
             final Action action = (Action) items[i][3];
             tile.setOnClickListener(v -> action.run());
+            if ((int) items[i][1] == R.string.qp_mirroring) {
+                airPlaySub = tile.findViewById(R.id.qpSub);
+                // Long press: the receiver's own settings (name, PIN).
+                tile.setOnLongClickListener(v -> {
+                    go(mirrorIntent);
+                    return true;
+                });
+                if (AirPlay.controllable(this)) AirPlay.status(this, this::showAirPlay);
+                else airPlaySub.setVisibility(View.GONE);
+            }
             if (i % 2 == 1) ((LinearLayout.LayoutParams) tile.getLayoutParams()).setMarginStart(gap);
             // An odd last tile (Running apps) is alone in its row, so it spans it.
             // The top row's Up goes to All settings; nothing else leaves the panel.
@@ -117,6 +129,25 @@ public class QuickPanelActivity extends Activity {
         }
         gear.setNextFocusDownId(((LinearLayout) tiles.getChildAt(0)).getChildAt(1).getId());
         overridePendingTransition(R.anim.qp_in, 0);
+    }
+
+    private TextView airPlaySub;
+
+    private void toggleAirPlay() {
+        if (airPlaySub == null) return;
+        boolean turnOn = !airPlayOn;
+        airPlaySub.setText(turnOn ? R.string.airplay_starting : R.string.airplay_stopping);
+        AirPlay.set(this, turnOn, this::showAirPlay);
+    }
+
+    private boolean airPlayOn;
+
+    private void showAirPlay(boolean on) {
+        airPlayOn = on;
+        if (airPlaySub == null) return;
+        String name = Settings.Global.getString(getContentResolver(), "device_name");
+        airPlaySub.setText(on ? getString(R.string.airplay_on, name == null ? "" : name) : getString(R.string.airplay_off));
+        airPlaySub.setVisibility(View.VISIBLE);
     }
 
     /** The Settings button again closes the panel (it arrives here because the panel is singleTask). */

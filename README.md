@@ -35,12 +35,15 @@ install tools and debloat approach it builds on. The home screen design is inspi
   Accessories directly, as Google TV's panel does: Settings only shows that page to holders of
   `WRITE_SECURE_SETTINGS`, which the install script grants over adb (without it, the remote-key service
   selects the entry inside Settings). Pages open in a fresh task, so one Back returns home.
-- **Mirroring** tile: opens an AirPlay receiver so an iPhone, iPad or Mac can mirror to the TV. It's a
-  separate app, [iMirror](https://github.com/prat3ik/iMirror) (GPL-3.0, kept out of this MIT codebase),
-  installed alongside; the tile only appears when it is (`mirroring_app` in config.xml). Build it from
-  source for your TV's ABI (`getprop ro.product.cpu.abilist`) and install it with `tools/b64push.py` +
-  `pm install`. It uses no memory until opened (start on boot is off by default); STOP in iMirror or
-  Clear all in Running apps ends it.
+- **AirPlay** tile: switches an AirPlay receiver on and off ("On · Bedroom" / "Off") so an iPhone, iPad or
+  Mac can mirror to the TV, without ever opening the receiver app; long press opens its settings. The
+  receiver is a separate app, [iMirror](https://github.com/prat3ik/iMirror) (GPL-3.0, kept out of this MIT
+  codebase), in a small fork that adds a control broadcast guarded by a signature permission (so it must
+  be signed with the same key as the launcher) and opens a bare full-screen video view by itself when a
+  session starts; Back ends the session. Install it with `tools/b64push.py` + `pm install`, then
+  `appops set dev.imirror.receiver SYSTEM_ALERT_WINDOW allow` and
+  `dumpsys deviceidle whitelist +dev.imirror.receiver` so it may start in the background. Without the
+  fork, the tile just opens the app. It's hidden from the app rows (`hidden_apps`).
 - **Running apps** (last tile of the quick panel): the apps you opened since the TV started, memory in
   use, ✕ per app and **Clear all**. Closing is a real force stop, which Android only allows the system,
   so the remote-key service presses Force stop → OK on each app's Settings page (about a second per app)
